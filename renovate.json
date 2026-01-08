@@ -4,6 +4,9 @@
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
+  "github-actions": {
+    "enabled": true
+  },
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
