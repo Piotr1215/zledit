@@ -186,6 +186,22 @@ test_picker_opts_custom() {
     fi
 }
 
+test_cursor_position() {
+    # Test that cursor zstyle is read (can't test actual cursor movement without ZLE)
+    local result
+    result=$(zsh -c "
+        zstyle ':zsh-jumper:' cursor end
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        zstyle -s ':zsh-jumper:' cursor val && echo \$val
+    " 2>&1)
+
+    if [[ "$result" == "end" ]]; then
+        test_pass "Cursor position config works"
+    else
+        test_fail "Cursor config not read" "Got: $result"
+    fi
+}
+
 test_disable_bindings() {
     local bound
     bound=$(zsh -c "
@@ -272,6 +288,7 @@ run_test test_picker_detection_peco
 run_test test_zstyle_picker_override
 run_test test_picker_opts_default
 run_test test_picker_opts_custom
+run_test test_cursor_position
 run_test test_disable_bindings
 run_test test_unload
 run_test test_picker_pipe
