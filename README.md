@@ -27,7 +27,6 @@ $ kubectl get pods -n kube-system --output wide
 - **Auto-detection**: Prefers fzf-tmux when in tmux, falls back to available picker
 - **Configurable**: Custom keybindings, picker options via zstyle
 - **Fast**: ~0.2ms load time (see [Performance](#performance))
-- **Clean**: Follows Zsh Plugin Standard, supports unloading
 
 ## Requirements
 
