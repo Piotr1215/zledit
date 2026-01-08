@@ -2,7 +2,9 @@
 
 Jump to any word on the current command line via fuzzy picker.
 
-```
+Long commands are tedious to navigate. Instead of holding arrow keys or `Ctrl+Left` repeatedly, fuzzy-search any word and jump straight to it.
+
+```bash
 $ kubectl get pods -n kube-system --output wide
                     ▲
               [Ctrl+X /]
@@ -103,6 +105,9 @@ zstyle ':zsh-jumper:' picker fzf
 # Custom picker options
 zstyle ':zsh-jumper:' picker-opts '--height=50% --reverse --border'
 
+# Cursor position after jump: start (default), middle, end
+zstyle ':zsh-jumper:' cursor end
+
 # Custom keybinding (default: ^X/)
 zstyle ':zsh-jumper:' binding '^J'
 
@@ -129,7 +134,7 @@ num  calls                time            self            name
  1)    1           0.23     0.23  100.00%  zsh-jumper-setup-bindings
 ```
 
-Single file, ~160 lines, **0.2ms** load time.
+**0.2ms** to load. No dependencies, no background processes.
 
 ## License
 

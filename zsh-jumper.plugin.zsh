@@ -101,9 +101,15 @@ zsh-jumper-widget() {
     target=$(printf '%s\n' "${words[@]}" | eval "$picker $opts")
 
     if [[ -n "$target" ]]; then
-        # Find position and move cursor
         local pos=$((${BUFFER[(i)$target]} - 1))
-        (( pos >= 0 )) && CURSOR=$pos
+        local cursor_pos
+        zstyle -s ':zsh-jumper:' cursor cursor_pos || cursor_pos='start'
+
+        case "$cursor_pos" in
+            end)    (( pos >= 0 )) && CURSOR=$((pos + ${#target})) ;;
+            middle) (( pos >= 0 )) && CURSOR=$((pos + ${#target} / 2)) ;;
+            *)      (( pos >= 0 )) && CURSOR=$pos ;;
+        esac
     fi
 
     zle redisplay
