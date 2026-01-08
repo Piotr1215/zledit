@@ -92,16 +92,35 @@ zsh-jumper-widget() {
         return 1
     fi
 
-    local words=(${(z)BUFFER})
+    local words=(${=BUFFER})
     [[ ${#words[@]} -eq 0 ]] && return 0
 
     opts="$(_zsh_jumper_get_picker_opts "$picker")"
 
-    # Run picker
-    target=$(printf '%s\n' "${words[@]}" | eval "$picker $opts")
+    # Number words for accurate position tracking (handles -u vs --user)
+    local numbered=() i
+    for i in {1..${#words[@]}}; do
+        numbered+=("$i: ${words[$i]}")
+    done
+
+    local selection
+    selection=$(printf '%s\n' "${numbered[@]}" | eval "$picker $opts")
+    [[ -z "$selection" ]] && { zle redisplay; return 0; }
+
+    # Extract index and find position
+    local idx="${selection%%:*}"
+    target="${words[$idx]}"
 
     if [[ -n "$target" ]]; then
-        local pos=$((${BUFFER[(i)$target]} - 1))
+        # Calculate position by walking to Nth word
+        local pos=0 j=1 remaining="$BUFFER"
+        while (( j < idx )); do
+            local wpos="${remaining[(i)${words[$j]}]}"
+            (( pos += wpos + ${#words[$j]} - 1 ))
+            remaining="${remaining:$((wpos + ${#words[$j]} - 1))}"
+            (( j++ ))
+        done
+        (( pos += ${remaining[(i)$target]} - 1 ))
         local cursor_pos
         zstyle -s ':zsh-jumper:' cursor cursor_pos || cursor_pos='start'
 
