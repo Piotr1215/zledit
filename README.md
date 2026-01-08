@@ -24,6 +24,7 @@ $ kubectl get pods -n kube-system --output wide
 - **Multiple picker support**: fzf, fzf-tmux, sk (skim), peco, percol
 - **Auto-detection**: Prefers fzf-tmux when in tmux, falls back to available picker
 - **Configurable**: Custom keybindings, picker options via zstyle
+- **Fast**: ~0.2ms load time (see [Performance](#performance))
 - **Clean**: Follows Zsh Plugin Standard, supports unloading
 
 ## Requirements
@@ -106,6 +107,17 @@ bindkey '^X^J' zsh-jumper-widget
 4. `sk` (skim)
 5. `peco`
 6. `percol`
+
+## Performance
+
+```
+% zmodload zsh/zprof && source zsh-jumper.plugin.zsh && zprof
+num  calls                time            self            name
+-------------------------------------------------------------------------------
+ 1)    1           0.23     0.23  100.00%  zsh-jumper-setup-bindings
+```
+
+Single file, ~160 lines, **0.2ms** load time.
 
 ## License
 

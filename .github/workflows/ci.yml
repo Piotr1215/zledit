@@ -41,7 +41,7 @@ jobs:
               sudo apt-get install -y fzf
               ;;
             sk)
-              curl -sL https://github.com/lotabout/skim/releases/download/v0.10.4/skim-v0.10.4-x86_64-unknown-linux-musl.tar.gz | tar xz
+              curl -sL https://github.com/skim-rs/skim/releases/download/v0.15.7/skim-x86_64-unknown-linux-musl.tar.gz | tar xz
               sudo mv sk /usr/local/bin/
               ;;
             peco)

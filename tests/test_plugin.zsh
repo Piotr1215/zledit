@@ -14,6 +14,7 @@ NC='\033[0m'
 
 typeset -gi TESTS_RUN=0
 typeset -gi TESTS_PASSED=0
+typeset -gi TESTS_SKIPPED=0
 
 test_pass() {
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -28,6 +29,11 @@ test_fail() {
 run_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
     "$@"
+}
+
+skip_test() {
+    TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+    print -- "- Skipping: $1"
 }
 
 # ------------------------------------------------------------------------------
@@ -76,7 +82,7 @@ test_global_state() {
 
 test_picker_detection_fzf() {
     if ! (( $+commands[fzf] )); then
-        print -- "- Skipping fzf test (not installed)"
+        skip_test "fzf not installed"
         return 0
     fi
 
@@ -95,7 +101,7 @@ test_picker_detection_fzf() {
 
 test_picker_detection_sk() {
     if ! (( $+commands[sk] )); then
-        print -- "- Skipping sk test (not installed)"
+        skip_test "sk not installed"
         return 0
     fi
 
@@ -114,7 +120,7 @@ test_picker_detection_sk() {
 
 test_picker_detection_peco() {
     if ! (( $+commands[peco] )); then
-        print -- "- Skipping peco test (not installed)"
+        skip_test "peco not installed"
         return 0
     fi
 
@@ -133,7 +139,7 @@ test_picker_detection_peco() {
 
 test_zstyle_picker_override() {
     if ! (( $+commands[fzf] )); then
-        print -- "- Skipping zstyle override test (fzf not installed)"
+        skip_test "zstyle override (fzf not installed)"
         return 0
     fi
 
@@ -221,7 +227,7 @@ test_picker_pipe() {
     " 2>&1)
 
     if [[ -z "$picker" ]]; then
-        print -- "- Skipping pipe test (no picker available)"
+        skip_test "pipe test (no picker)"
         return 0
     fi
 
@@ -234,12 +240,11 @@ test_picker_pipe() {
             result=$(print -l foo bar baz | sk --filter="foo" --no-sort 2>/dev/null | head -1)
             ;;
         peco)
-            # peco doesn't have --filter, skip
-            print -- "- Skipping pipe test for peco (no filter mode)"
+            skip_test "pipe test for peco (no filter mode)"
             return 0
             ;;
         *)
-            print -- "- Skipping pipe test for $picker"
+            skip_test "pipe test for $picker"
             return 0
             ;;
     esac
@@ -272,6 +277,7 @@ run_test test_unload
 run_test test_picker_pipe
 
 print ""
-print "=== Results: $TESTS_PASSED/$TESTS_RUN passed ==="
+local actual_tests=$((TESTS_RUN - TESTS_SKIPPED))
+print "=== Results: $TESTS_PASSED/$actual_tests passed ($TESTS_SKIPPED skipped) ==="
 
-[[ $TESTS_PASSED -eq $TESTS_RUN ]]
+[[ $TESTS_PASSED -eq $actual_tests ]]
