@@ -11,15 +11,17 @@ $ kubectl get pods -n kube-system --output wide
                     │
          ┌──────────┴──────────┐
          │      jump>          │
-         │  kubectl            │
-         │  get                │
-         │> pods               │
-         │  -n                 │
-         │  kube-system        │
-         │  --output           │
-         │  wide               │
+         │  1: kubectl         │
+         │  2: get             │
+         │> 3: pods            │
+         │  4: -n              │
+         │  5: kube-system     │
+         │  6: --output        │
+         │  7: wide            │
          └─────────────────────┘
 ```
+
+Words are numbered to ensure accurate cursor placement. This prevents issues where short flags like `-u` might match inside longer options like `--user`.
 
 ## Features
 
