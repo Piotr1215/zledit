@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shellcheck
+        run: |
+          # Shellcheck with zsh-specific exclusions
+          shellcheck -s bash -e SC1071,SC2034,SC2296,SC2168,SC2154,SC1090,SC2086 \
+            zsh-jumper.plugin.zsh || true
+          echo "Shellcheck completed (warnings only for zsh)"
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        picker: [fzf, sk, peco]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zsh (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Install picker (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          case "${{ matrix.picker }}" in
+            fzf)
+              sudo apt-get install -y fzf
+              ;;
+            sk)
+              curl -sL https://github.com/lotabout/skim/releases/download/v0.10.4/skim-v0.10.4-x86_64-unknown-linux-musl.tar.gz | tar xz
+              sudo mv sk /usr/local/bin/
+              ;;
+            peco)
+              curl -sL https://github.com/peco/peco/releases/download/v0.5.11/peco_linux_amd64.tar.gz | tar xz
+              sudo mv peco_linux_amd64/peco /usr/local/bin/
+              ;;
+          esac
+
+      - name: Install picker (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ${{ matrix.picker }}
+
+      - name: Verify zsh syntax
+        run: zsh -n zsh-jumper.plugin.zsh
+
+      - name: Run tests
+        run: zsh tests/test_plugin.zsh
+
+  test-no-picker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install zsh
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Test graceful handling without picker
+        run: |
+          zsh -c '
+            source ./zsh-jumper.plugin.zsh
+            # Should return empty/error without picker
+            result=$(_zsh_jumper_detect_picker 2>&1)
+            [[ -z "$result" ]] && echo "Correctly returns empty when no picker" && exit 0
+            echo "Unexpected: $result"
+            exit 1
+          '
