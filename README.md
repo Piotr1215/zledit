@@ -80,6 +80,18 @@ source /path/to/zsh-jumper/zsh-jumper.plugin.zsh
 
 Press `Ctrl+X /` (default) on a command line with multiple words. Select a word to jump cursor there.
 
+**Tip**: After jumping, use `Alt+D` to delete the word, or `Ctrl+W` to delete backward - useful for quick replacements.
+
+### Vi mode
+
+For vi mode users, bind to both insert and command modes:
+
+```zsh
+zstyle ':zsh-jumper:' disable-bindings yes
+bindkey -M viins '^X/' zsh-jumper-widget
+bindkey -M vicmd '^X/' zsh-jumper-widget
+```
+
 ## Configuration
 
 Configure via zstyle in your `.zshrc` **before** loading the plugin:
