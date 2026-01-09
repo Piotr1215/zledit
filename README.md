@@ -85,6 +85,19 @@ Press `Ctrl+X /` (default) on a command line with multiple words. Select a word 
 
 **Tip**: After jumping, use `Alt+D` to delete the word, or `Ctrl+W` to delete backward - useful for quick replacements.
 
+### Multiline Commands
+
+Multiline commands with backslash are also supported, for example:
+
+```bash
+$ docker run -d \
+    --name my-container \
+    --network host \
+    nginx:latest
+```
+
+Words are split on whitespace (spaces, tabs, newlines). Line continuation backslashes are filtered out, so you see only actual command tokens in the picker.
+
 ### Vi mode
 
 For vi mode users, bind to both insert and command modes:
@@ -128,14 +141,14 @@ bindkey '^X^J' zsh-jumper-widget
 
 ## Performance
 
+Measured load time:
+
 ```
 % zmodload zsh/zprof && source zsh-jumper.plugin.zsh && zprof
 num  calls                time            self            name
 -------------------------------------------------------------------------------
  1)    1           0.23     0.23  100.00%  zsh-jumper-setup-bindings
 ```
-
-**0.2ms** to load. No dependencies, no background processes.
 
 ## License
 

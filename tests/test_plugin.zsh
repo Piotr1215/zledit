@@ -575,6 +575,24 @@ test_tabs_and_newlines() {
     fi
 }
 
+test_backslash_continuation() {
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        BUFFER=$'"'"'kubectl get pods \
+--namespace kube-system \
+-o wide'"'"'
+        words=(${${${=BUFFER}:#}:#\\})
+        echo "${#words[@]}:${words[4]}"
+    ' 2>&1)
+
+    if [[ "$result" == "7:--namespace" ]]; then
+        test_pass "Backslash continuation handled"
+    else
+        test_fail "Backslash continuation failed" "Expected: 7:--namespace, Got: $result"
+    fi
+}
+
 test_quoted_strings() {
     # Quoted strings (not shell-parsed, just tokens)
     local result
@@ -826,6 +844,7 @@ run_test test_all_special_chars
 run_test test_numbers
 run_test test_long_buffer
 run_test test_tabs_and_newlines
+run_test test_backslash_continuation
 run_test test_quoted_strings
 run_test test_pipes_and_redirects
 run_test test_cyrillic
