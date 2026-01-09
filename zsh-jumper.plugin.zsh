@@ -92,7 +92,7 @@ zsh-jumper-widget() {
         return 1
     fi
 
-    local words=(${=BUFFER})
+    local words=(${${${=BUFFER}:#}:#\\})
     [[ ${#words[@]} -eq 0 ]] && return 0
 
     opts="$(_zsh_jumper_get_picker_opts "$picker")"
