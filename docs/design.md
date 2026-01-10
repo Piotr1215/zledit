@@ -181,7 +181,7 @@ _zsh_jumper_do_jump() {
 
 ## Testing Strategy
 
-57 tests covering:
+Tests covering:
 
 1. **Unit tests** - Tokenizer in isolation
 2. **Edge cases** - Unicode, special chars, long strings

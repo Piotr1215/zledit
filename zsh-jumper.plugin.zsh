@@ -69,13 +69,16 @@ typeset -g _zj_result_key _zj_result_selection
 #   Return: 0 = success, 1 = cancelled/error
 # ------------------------------------------------------------------------------
 
-_zsh_jumper_adapter_fzf() {
-    local -a base_opts=(--height=40% --reverse)
+# Shared helper for fzf-like pickers (fzf, fzf-tmux, sk)
+# Args: $1=command, $2=height (empty for fzf-tmux which uses tmux pane)
+_zsh_jumper_adapter_fzflike() {
+    local cmd="$1"
+    local -a base_opts=(${2:+--height=$2} --reverse)
     [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
 
     local result
     if [[ -n "$_zj_invoke_binds" ]]; then
-        result=$(fzf "${base_opts[@]}" \
+        result=$($cmd "${base_opts[@]}" \
             --prompt="$_zj_invoke_prompt" \
             --header="$_zj_invoke_header" \
             --bind "$_zj_invoke_binds" \
@@ -83,74 +86,30 @@ _zsh_jumper_adapter_fzf() {
         _zj_result_key="${result%%$'\n'*}"
         _zj_result_selection="${result#*$'\n'}"
     else
-        result=$(fzf "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
+        result=$($cmd "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
         _zj_result_key=""
         _zj_result_selection="$result"
     fi
     [[ -n "$_zj_result_selection" ]]
 }
 
-_zsh_jumper_adapter_fzf-tmux() {
-    local -a base_opts=(--reverse)
-    [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
+_zsh_jumper_adapter_fzf() { _zsh_jumper_adapter_fzflike fzf 40%; }
+_zsh_jumper_adapter_fzf-tmux() { _zsh_jumper_adapter_fzflike fzf-tmux; }
+_zsh_jumper_adapter_sk() { _zsh_jumper_adapter_fzflike sk 40%; }
 
-    local result
-    if [[ -n "$_zj_invoke_binds" ]]; then
-        result=$(fzf-tmux "${base_opts[@]}" \
-            --prompt="$_zj_invoke_prompt" \
-            --header="$_zj_invoke_header" \
-            --bind "$_zj_invoke_binds" \
-            "${_zj_invoke_preview_args[@]}")
-        _zj_result_key="${result%%$'\n'*}"
-        _zj_result_selection="${result#*$'\n'}"
-    else
-        result=$(fzf-tmux "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
-        _zj_result_key=""
-        _zj_result_selection="$result"
-    fi
-    [[ -n "$_zj_result_selection" ]]
-}
-
-_zsh_jumper_adapter_sk() {
-    local -a base_opts=(--height=40% --reverse)
-    [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
-
-    local result
-    if [[ -n "$_zj_invoke_binds" ]]; then
-        result=$(sk "${base_opts[@]}" \
-            --prompt="$_zj_invoke_prompt" \
-            --header="$_zj_invoke_header" \
-            --bind "$_zj_invoke_binds" \
-            "${_zj_invoke_preview_args[@]}")
-        _zj_result_key="${result%%$'\n'*}"
-        _zj_result_selection="${result#*$'\n'}"
-    else
-        result=$(sk "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
-        _zj_result_key=""
-        _zj_result_selection="$result"
-    fi
-    [[ -n "$_zj_result_selection" ]]
-}
-
-_zsh_jumper_adapter_peco() {
+# Shared helper for simple pickers (no bind support)
+_zsh_jumper_adapter_simple() {
+    local cmd="$1"
     local -a base_opts=()
     [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
 
-    # peco doesn't support binds
     _zj_result_key=""
-    _zj_result_selection=$(peco "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
+    _zj_result_selection=$($cmd "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
     [[ -n "$_zj_result_selection" ]]
 }
 
-_zsh_jumper_adapter_percol() {
-    local -a base_opts=()
-    [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
-
-    # percol doesn't support binds
-    _zj_result_key=""
-    _zj_result_selection=$(percol "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
-    [[ -n "$_zj_result_selection" ]]
-}
+_zsh_jumper_adapter_peco() { _zsh_jumper_adapter_simple peco; }
+_zsh_jumper_adapter_percol() { _zsh_jumper_adapter_simple percol; }
 
 # ------------------------------------------------------------------------------
 # Port: Unified Picker Interface
@@ -196,16 +155,16 @@ _zsh_jumper_supports_binds() {
 # ------------------------------------------------------------------------------
 
 # Hint keys: home row first, then top row, then bottom
-typeset -ga _zj_hint_keys=(a s d f g h j k l \; q w e r t y u i o p z x c v b n m)
+typeset -ga _zj_hint_keys=(a s d f g h j k l q w e r t y u i o p z x c v b n m)
 
 _zsh_jumper_build_overlay() {
-    local -a hints=(a s d f g h j k l \; q w e r t y u i o p z x c v b n m)
+    local -a hints=(a s d f g h j k l q w e r t y u i o p z x c v b n m)
     local i=1 pos word last_end=0 result=""
     while (( i <= ${#_zj_words[@]} )); do
         pos=${_zj_positions[$i]}
         word=${_zj_words[$i]}
         result+="${BUFFER:$last_end:$((pos - last_end))}"
-        (( i <= 27 )) && result+="[${hints[$i]}]${word}" || result+="[${i}]${word}"
+        (( i <= ${#hints[@]} )) && result+="[${hints[$i]}]${word}" || result+="[${i}]${word}"
         last_end=$((pos + ${#word}))
         (( i++ ))
     done
@@ -213,14 +172,27 @@ _zsh_jumper_build_overlay() {
     REPLY="$result"
 }
 
-# Highlight hint keys [a] [s] etc with color via region_highlight
+# Highlight hint keys [a] [s] [27] etc with color via region_highlight
 _zsh_jumper_highlight_hints() {
     region_highlight=()
-    local i=0 len=${#BUFFER}
-    while (( i < len - 2 )); do
-        if [[ "${BUFFER:$i:1}" == "[" && "${BUFFER:$((i+2)):1}" == "]" ]]; then
-            region_highlight+=("$i $((i+3)) fg=yellow,bold")
-            (( i += 3 ))
+    local i=0 len=${#BUFFER} j content
+    while (( i < len )); do
+        if [[ "${BUFFER:$i:1}" == "[" ]]; then
+            # Find closing ]
+            j=$((i + 1))
+            while (( j < len )) && [[ "${BUFFER:$j:1}" != "]" ]]; do
+                (( j++ ))
+            done
+            if (( j < len )); then
+                content="${BUFFER:$((i+1)):$((j-i-1))}"
+                # Highlight if content is a single letter (a-z) or a number
+                if [[ "$content" == [a-z] ]] || [[ "$content" =~ ^[0-9]+$ ]]; then
+                    region_highlight+=("$i $((j+1)) fg=yellow,bold")
+                fi
+                (( i = j + 1 ))
+            else
+                (( i++ ))
+            fi
         else
             (( i++ ))
         fi
@@ -275,6 +247,25 @@ _zsh_jumper_tokenize() {
     fi
 }
 
+_zsh_jumper_preview() {
+    local t="$1"
+    t="${t#*: }"
+    t="${t//\"/}"
+    t="${t//\'/}"
+    [[ "$t" == *=* ]] && t="${t##*=}"
+    [[ "$t" == "~"* ]] && t="$HOME${t#"~"}"
+
+    if [[ -d "$t" ]]; then
+        ls -la "$t" 2>/dev/null
+    elif [[ -f "$t" ]]; then
+        if command -v bat >/dev/null; then
+            bat --style=plain --color=always -n --line-range=:30 "$t" 2>/dev/null
+        else
+            head -30 "$t" 2>/dev/null
+        fi
+    fi
+}
+
 # ------------------------------------------------------------------------------
 # Main Widget
 # ------------------------------------------------------------------------------
@@ -311,25 +302,27 @@ zsh-jumper-widget() {
     if _zsh_jumper_supports_binds "$picker"; then
         local wk=${ZshJumper[wrap-key]#ctrl-} hk=${ZshJumper[help-key]#ctrl-}
         local vk=${ZshJumper[var-key]#ctrl-} rk=${ZshJumper[replace-key]#ctrl-}
-        header="^${(U)wk}:wrap | ^${(U)hk}:help | ^${(U)vk}:var | ^${(U)rk}:replace | ${ZshJumper[instant-key]}:instant"
+        local ik=${ZshJumper[instant-key]}
+        header="^${(U)wk}:wrap | ^${(U)hk}:help | ^${(U)vk}:var | ^${(U)rk}:replace | ${ik}+a-z:jump"
 
-        # Build hint key bindings (a,s,d... print hint-X and accept)
-        local hint_binds="" unbind_hints="" rebind_hints="" k
+        # Build hint key bindings and unbind/rebind lists
+        # Letter keys start unbound (for fuzzy search), instant-key rebinds them
+        local hint_binds="" unbinds="" rebinds="" k
         for k in a s d f g h j k l q w e r t y u i o p z x c v b n m; do
             hint_binds+=",$k:print(hint-$k)+accept"
-            unbind_hints+="${unbind_hints:++}unbind($k)"
-            rebind_hints+="${rebind_hints:++}rebind($k)"
+            unbinds+="${unbinds:+,}$k"
+            rebinds+="${rebinds:+,}$k"
         done
 
-        # Start with hint keys unbound; ; rebinds them for instant mode
-        binds="start:${unbind_hints}"
-        binds+=",enter:print()+accept"
+        binds="enter:print()+accept"
         binds+=",${ZshJumper[wrap-key]}:print(wrap)+accept"
         binds+=",${ZshJumper[help-key]}:print(help)+accept"
         binds+=",${ZshJumper[var-key]}:print(var)+accept"
         binds+=",${ZshJumper[replace-key]}:print(replace)+accept"
-        binds+=",${ZshJumper[instant-key]}:${rebind_hints}+change-prompt(HINT> )"
         binds+="$hint_binds"
+        # Start with letter keys unbound; instant-key rebinds them
+        binds+=",start:unbind($unbinds)"
+        binds+=",${ik}:rebind($rebinds)"
 
         if [[ "${ZshJumper[preview]}" != "off" ]]; then
             local preview_cmd='t="{}"; t="${t#*: }"; t="${t//\"/}"; t="${t//'"'"'/}"; [[ "$t" == *=* ]] && t="${t##*=}"; [[ "$t" == "~"* ]] && t="$HOME${t#"~"}"; [ -d "$t" ] && ls -la "$t" 2>/dev/null || [ -f "$t" ] && { command -v bat >/dev/null && bat --style=plain --color=always -n --line-range=:30 "$t" 2>/dev/null || head -30 "$t" 2>/dev/null; }'
@@ -387,12 +380,12 @@ zsh-jumper-widget() {
 # Actions
 # ------------------------------------------------------------------------------
 
-# Extract index from selection format: "[a] 1: word" or "1: word"
+# Extract index from selection format: "[a] 1: word" or "[123] 1: word" or "1: word"
 _zsh_jumper_extract_index() {
     local sel="$1"
-    # Strip hint prefix if present: "[a] 1: word" -> "1: word"
-    sel="${sel#\[?\] }"
-    sel="${sel#\[??\] }"
+    # Strip hint prefix if present: "[...] N: word" -> "N: word"
+    # Uses shortest match (#) to strip first [...] followed by space
+    sel="${sel#\[*\] }"
     # Extract number before colon
     echo "${sel%%:*}"
 }
@@ -510,13 +503,16 @@ _zsh_jumper_do_var() {
 
     local pos="${_zj_positions[$idx]}"
     local target="${_zj_words[$idx]}"
-    local var_name="${${(U)target}//[^A-Z0-9]/_}"
+    local base="${target#\$}"
+    local var_name="${${(U)base}//[^A-Z0-9]/_}"
     local end_pos=$((pos + ${#target}))
 
     BUFFER="${BUFFER:0:$pos}\"\$${var_name}\"${BUFFER:$end_pos}"
     CURSOR=$((pos + 1))
     zle push-line
-    BUFFER="${var_name}=\"${target}\""
+    # Escape double quotes in target for assignment
+    local escaped_target="${target//\"/\\\"}"
+    BUFFER="${var_name}=\"${escaped_target}\""
     CURSOR=$((${#var_name} + 1))
 }
 
