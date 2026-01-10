@@ -1,0 +1,46 @@
+# Wrap action test cases
+# Format: input<TAB>token_idx<TAB>wrapper_type<TAB>expected_buffer
+# TAB-separated to allow special characters
+
+# Double quotes
+echo foo bar	2	"..."	echo "foo" bar
+hello world	1	"..."	"hello" world
+abc	1	"..."	"abc"
+
+# Single quotes
+echo foo bar	2	'...'	echo 'foo' bar
+hello world	1	'...'	'hello' world
+
+# Quoted variable "$..."
+myvar	1	"$..."	"$myvar"
+echo foo	2	"$..."	echo "$foo"
+
+# Variable expansion ${...}
+myvar	1	${...}	${myvar}
+echo foo	2	${...}	echo ${foo}
+
+# Command substitution $(...)
+date	1	$(...)	$(date)
+echo cmd	2	$(...)	echo $(cmd)
+
+# Backtick legacy
+date	1	`...`	`date`
+
+# Square brackets
+test	1	[...]	[test]
+
+# Curly braces
+a,b,c	1	{...}	{a,b,c}
+
+# Parentheses
+subshell	1	(...)	(subshell)
+
+# Angle brackets
+file	1	<...>	<file>
+
+# Edge cases - special characters in tokens
+--flag=value	1	"..."	"--flag=value"
+"quoted"	1	'...'	'"quoted"'
+$var	1	"..."	"$var"
+🚀rocket	1	"..."	"🚀rocket"
+path/to/file	1	"..."	"path/to/file"

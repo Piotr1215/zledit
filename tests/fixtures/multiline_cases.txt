@@ -1,0 +1,16 @@
+# Multiline command test cases
+# Format: input<TAB>expected_count<TAB>expected_positions
+# Use <NL> for newline (backslash before <NL> is filtered by tokenizer)
+
+# Basic continuation
+docker run \<NL>  -d	3	0 7 15
+kubectl get \<NL>  pods	3	0 8 16
+
+# Multiple continuations
+cmd \<NL>  arg1 \<NL>  arg2	3	0 8 17
+
+# With flags
+docker run \<NL>  --name foo \<NL>  -d	5	0 7 15 22 30
+
+# Simple newline (no backslash)
+echo \<NL>foo	2	0 7
