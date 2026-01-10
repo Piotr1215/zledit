@@ -1,0 +1,32 @@
+# Var extraction test cases
+# Format: input<TAB>token_idx<TAB>expected_var_name<TAB>expected_buffer_after_replace
+# TAB-separated to allow special characters
+
+# Basic
+echo foo bar	2	FOO	echo "$FOO" bar
+hello world	1	HELLO	"$HELLO" world
+
+# Dashes become underscores
+my-variable	1	MY_VARIABLE	"$MY_VARIABLE"
+echo --my-flag	2	__MY_FLAG	echo "$__MY_FLAG"
+
+# Special chars become underscores
+path/to/file	1	PATH_TO_FILE	"$PATH_TO_FILE"
+key=value	1	KEY_VALUE	"$KEY_VALUE"
+user@host	1	USER_HOST	"$USER_HOST"
+
+# Numbers preserved
+var123	1	VAR123	"$VAR123"
+123start	1	123START	"$123START"
+a1b2c3	1	A1B2C3	"$A1B2C3"
+
+# Multiple special chars
+a--b__c	1	A__B__C	"$A__B__C"
+!!!bang	1	___BANG	"$___BANG"
+
+# Unicode to underscore
+café	1	CAF_	"$CAF_"
+
+# Real commands - extract argument
+kubectl get pods	3	PODS	kubectl get "$PODS"
+git commit -m message	4	MESSAGE	git commit -m "$MESSAGE"

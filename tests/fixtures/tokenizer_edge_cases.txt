@@ -1,0 +1,62 @@
+# Tokenizer invariant: whitespace = token boundary
+# Format: input<TAB>expected_word_count<TAB>expected_positions
+# TAB-separated to allow | in test data
+
+# Basic
+echo foo bar	3	0 5 9
+single	1	0
+
+# Multiple spaces
+echo    foo     bar	3	0 8 16
+a  b  c	3	0 3 6
+
+# Leading/trailing
+   leading	1	3
+trailing   	1	0
+
+# Quotes are just characters
+"hello"	1	0
+'single'	1	0
+"""""""	1	0
+''''''	1	0
+
+# Pipes are just characters (no space = one token)
+cat|grep	1	0
+a|b|c	1	0
+
+# Pipes WITH spaces = multiple tokens
+cat | grep	3	0 4 6
+a | b | c	5	0 2 4 6 8
+
+# Symbols
+!@#$%^&*()	1	0
+--flag=value	1	0
+key=val	1	0
+http://url.com/path	1	0
+user@host:path	1	0
+
+# Unicode - positions are character-based
+hello world	2	0 6
+abc def	2	0 4
+
+# Emojis (positions are character-based, emoji = 1 char)
+🚀 launch	2	0 2
+echo 👋	2	0 5
+🎉🎊🎁	1	0
+a 🔥 b	3	0 2 4
+
+# Non-printable / control chars (bell, escape)
+abc	1	0
+def	1	0
+
+# Backslash (not shell-interpreted, just chars)
+echo\ foo	2	0 6
+path\ with\ spaces	3	0 6 12
+foo\\bar	1	0
+\\	1	0
+a\tb\nc	1	0
+
+# Real commands
+git commit -m message	4	0 4 11 14
+kubectl get pods	3	0 8 12
+echo --flag	2	0 5
