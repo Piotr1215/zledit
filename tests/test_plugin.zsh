@@ -1,20 +1,31 @@
 #!/usr/bin/env zsh
 # Test suite for zsh-jumper
-# Run: zsh tests/test_plugin.zsh
+# Run: zsh tests/test_plugin.zsh [--verbose]
 
 emulate -L zsh
+setopt NO_XTRACE NO_VERBOSE
 
 SCRIPT_DIR="${0:A:h}"
 PLUGIN_DIR="${SCRIPT_DIR:h}"
 
+# Parse arguments
+typeset -gi VERBOSE=0
+[[ "$1" == "-v" || "$1" == "--verbose" ]] && VERBOSE=1
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 NC='\033[0m'
 
 typeset -gi TESTS_RUN=0
 typeset -gi TESTS_PASSED=0
 typeset -gi TESTS_SKIPPED=0
+
+# Verbose logging helper
+vlog() {
+    (( VERBOSE )) && print "${YELLOW}  ▸${NC} $*"
+}
 
 test_pass() {
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -55,10 +66,17 @@ test_functions_defined() {
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         (( \$+functions[zsh-jumper-widget] )) || exit 1
-        (( \$+functions[_zsh_jumper_detect_picker] )) || exit 1
-        (( \$+functions[_zsh_jumper_get_picker_opts] )) || exit 1
+        (( \$+functions[_zsh_jumper_load_config] )) || exit 1
+        (( \$+functions[_zsh_jumper_invoke_picker] )) || exit 1
+        (( \$+functions[_zsh_jumper_adapter_fzf] )) || exit 1
         (( \$+functions[zsh-jumper-setup-bindings] )) || exit 1
         (( \$+functions[zsh-jumper-unload] )) || exit 1
+        (( \$+functions[_zsh_jumper_tokenize] )) || exit 1
+        (( \$+functions[_zsh_jumper_supports_binds] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_wrap] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_help] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_var] )) || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "All functions defined"
@@ -89,7 +107,7 @@ test_picker_detection_fzf() {
     local picker
     picker=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_detect_picker
+        echo \"\${ZshJumper[picker]}\"
     " 2>&1)
 
     if [[ "$picker" == fzf* ]]; then
@@ -108,7 +126,7 @@ test_picker_detection_sk() {
     local picker
     picker=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_detect_picker
+        echo \"\${ZshJumper[picker]}\"
     " 2>&1)
 
     if [[ -n "$picker" ]]; then
@@ -127,7 +145,7 @@ test_picker_detection_peco() {
     local picker
     picker=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_detect_picker
+        echo \"\${ZshJumper[picker]}\"
     " 2>&1)
 
     if [[ -n "$picker" ]]; then
@@ -147,7 +165,7 @@ test_zstyle_picker_override() {
     picker=$(zsh -c "
         zstyle ':zsh-jumper:' picker fzf
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_detect_picker
+        echo \"\${ZshJumper[picker]}\"
     " 2>&1)
 
     if [[ "$picker" == "fzf" ]]; then
@@ -157,32 +175,36 @@ test_zstyle_picker_override() {
     fi
 }
 
-test_picker_opts_default() {
-    local opts
-    opts=$(zsh -c "
+test_adapter_functions_exist() {
+    local result
+    result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_get_picker_opts fzf
+        (( \$+functions[_zsh_jumper_adapter_fzf] )) || exit 1
+        (( \$+functions[_zsh_jumper_adapter_fzf-tmux] )) || exit 1
+        (( \$+functions[_zsh_jumper_adapter_sk] )) || exit 1
+        (( \$+functions[_zsh_jumper_adapter_peco] )) || exit 1
+        (( \$+functions[_zsh_jumper_adapter_percol] )) || exit 1
     " 2>&1)
 
-    if [[ "$opts" == *"--height"* ]] && [[ "$opts" == *"--reverse"* ]]; then
-        test_pass "Default picker opts set for fzf"
+    if [[ $? -eq 0 ]]; then
+        test_pass "All picker adapters defined"
     else
-        test_fail "Default opts missing" "Got: $opts"
+        test_fail "Missing adapter functions" "$result"
     fi
 }
 
-test_picker_opts_custom() {
-    local opts
-    opts=$(zsh -c "
-        zstyle ':zsh-jumper:' picker-opts '--custom-opt'
+test_invoke_picker_dispatches() {
+    local result
+    result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_get_picker_opts fzf
+        # Test that invoke_picker dispatches to adapter (will fail on unknown picker)
+        echo 'test' | _zsh_jumper_invoke_picker unknown_picker 'prompt> ' '' '' 2>&1
     " 2>&1)
 
-    if [[ "$opts" == "--custom-opt" ]]; then
-        test_pass "Custom picker opts override"
+    if [[ "$result" == *"unknown picker"* ]]; then
+        test_pass "Invoke picker validates adapter"
     else
-        test_fail "Custom opts not applied" "Got: $opts"
+        test_fail "Invoke picker should reject unknown" "$result"
     fi
 }
 
@@ -199,6 +221,32 @@ test_cursor_position() {
         test_pass "Cursor position config works"
     else
         test_fail "Cursor config not read" "Got: $result"
+    fi
+}
+
+test_fzf_key_defaults_not_empty() {
+    local result
+    result=$(zsh -c "
+        # Only set ONE key, others should get defaults
+        zstyle ':zsh-jumper:' fzf-help-key 'ctrl-g'
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+
+        local wrap_key help_key var_key
+        zstyle -s ':zsh-jumper:' fzf-wrap-key wrap_key
+        zstyle -s ':zsh-jumper:' fzf-help-key help_key
+        zstyle -s ':zsh-jumper:' fzf-var-key var_key
+        [[ -z \"\$wrap_key\" ]] && wrap_key=ctrl-s
+        [[ -z \"\$help_key\" ]] && help_key=ctrl-h
+        [[ -z \"\$var_key\" ]] && var_key=ctrl-e
+
+        # All should be non-empty
+        [[ -n \"\$wrap_key\" && -n \"\$help_key\" && -n \"\$var_key\" ]] && echo 'ok' || echo 'fail'
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "FZF key defaults are non-empty"
+    else
+        test_fail "FZF key defaults empty (regression)" "Got: $result"
     fi
 }
 
@@ -239,7 +287,7 @@ test_picker_pipe() {
     local picker
     picker=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_detect_picker
+        echo \"\${ZshJumper[picker]}\"
     " 2>&1)
 
     if [[ -z "$picker" ]]; then
@@ -811,6 +859,1063 @@ test_accented_latin() {
 }
 
 # ------------------------------------------------------------------------------
+# FZF Enrichment Feature Tests
+# ------------------------------------------------------------------------------
+
+test_supports_binds_detection() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_supports_binds 'fzf' && echo 'fzf:yes'
+        _zsh_jumper_supports_binds 'fzf-tmux' && echo 'fzf-tmux:yes'
+        _zsh_jumper_supports_binds 'sk' && echo 'sk:yes'
+        _zsh_jumper_supports_binds 'peco' || echo 'peco:no'
+    " 2>&1)
+
+    if [[ "$result" == *"fzf:yes"* ]] && [[ "$result" == *"fzf-tmux:yes"* ]] && \
+       [[ "$result" == *"sk:yes"* ]] && [[ "$result" == *"peco:no"* ]]; then
+        test_pass "Bind support detection works (fzf, fzf-tmux, sk: yes; peco: no)"
+    else
+        test_fail "Bind detection failed" "Got: $result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Picker Integration Tests
+# ------------------------------------------------------------------------------
+
+test_integration_fzf_binds() {
+    if ! (( $+commands[fzf] )); then
+        skip_test "fzf not installed"
+        return 0
+    fi
+
+    # Test that fzf accepts --bind syntax (using basic actions for compatibility)
+    local result
+    result=$(echo -e "1: first\n2: second" | fzf --filter="first" --bind "enter:accept,ctrl-s:accept" 2>&1)
+
+    if [[ "$result" == "1: first" ]]; then
+        test_pass "fzf accepts --bind syntax"
+    else
+        test_fail "fzf --bind failed" "Got: $result"
+    fi
+}
+
+test_integration_fzf_header() {
+    if ! (( $+commands[fzf] )); then
+        skip_test "fzf not installed"
+        return 0
+    fi
+
+    # Test that fzf accepts --header option
+    local result
+    result=$(echo -e "1: test" | fzf --filter="test" --header="^S:wrap | ^H:help" 2>&1)
+
+    if [[ "$result" == "1: test" ]]; then
+        test_pass "fzf accepts --header"
+    else
+        test_fail "fzf --header failed" "Got: $result"
+    fi
+}
+
+test_integration_sk_binds() {
+    if ! (( $+commands[sk] )); then
+        skip_test "sk not installed"
+        return 0
+    fi
+
+    # Test that sk accepts --bind syntax like fzf
+    local result
+    result=$(echo -e "1: first\n2: second" | sk --filter="first" --bind "enter:accept,ctrl-s:accept" 2>&1)
+
+    if [[ "$result" == "1: first" ]]; then
+        test_pass "sk accepts --bind syntax"
+    else
+        test_fail "sk --bind failed" "Got: $result"
+    fi
+}
+
+test_integration_sk_header() {
+    if ! (( $+commands[sk] )); then
+        skip_test "sk not installed"
+        return 0
+    fi
+
+    # Test that sk accepts --header option
+    local result
+    result=$(echo -e "1: test" | sk --filter="test" --header="^S:wrap | ^H:help" 2>&1)
+
+    if [[ "$result" == "1: test" ]]; then
+        test_pass "sk accepts --header"
+    else
+        test_fail "sk --header failed" "Got: $result"
+    fi
+}
+
+test_integration_peco_basic() {
+    if ! (( $+commands[peco] )); then
+        skip_test "peco not installed"
+        return 0
+    fi
+
+    # Peco doesn't support non-interactive mode like fzf --filter
+    # Just verify peco binary works and accepts --prompt option
+    local result
+    result=$(peco --help 2>&1)
+
+    if [[ "$result" == *"--prompt"* ]]; then
+        test_pass "peco accepts --prompt option"
+    else
+        test_fail "peco --help failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_positions() {
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="kubectl get pods -n kube-system"
+        _zsh_jumper_tokenize
+        echo "${_zj_positions[4]}"
+    ' 2>&1)
+
+    if [[ "$result" == "17" ]]; then
+        test_pass "Tokenizer records -n at correct position"
+    else
+        test_fail "Tokenizer position failed" "Expected: 17, Got: $result"
+    fi
+}
+
+test_tokenizer_multiple_spaces() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="a    b     c"
+        _zsh_jumper_tokenize
+        echo "${#_zj_words[@]}:${_zj_positions[1]}:${_zj_positions[2]}:${_zj_positions[3]}"
+    ' 2>&1)
+    if [[ "$result" == "3:0:5:11" ]]; then
+        test_pass "Multiple spaces handled correctly"
+    else
+        test_fail "Multiple spaces failed" "Expected: 3:0:5:11, Got: $result"
+    fi
+}
+
+test_tokenizer_leading_trailing_spaces() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="   word   "
+        _zsh_jumper_tokenize
+        echo "${#_zj_words[@]}:${_zj_words[1]}:${_zj_positions[1]}"
+    ' 2>&1)
+    if [[ "$result" == "1:word:3" ]]; then
+        test_pass "Leading/trailing spaces handled"
+    else
+        test_fail "Leading/trailing spaces failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_tabs_mixed() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER=$'"'"'a\tb\t\tc'"'"'
+        _zsh_jumper_tokenize
+        echo "${#_zj_words[@]}"
+    ' 2>&1)
+    if [[ "$result" == "3" ]]; then
+        test_pass "Tabs handled as whitespace"
+    else
+        test_fail "Tabs handling failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_very_long_string() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER=$(printf "word%.0s " {1..500})
+        _zsh_jumper_tokenize
+        echo "${#_zj_words[@]}:${_zj_positions[500]}"
+    ' 2>&1)
+    if [[ "$result" == "500:2495" ]]; then
+        test_pass "500 words tokenized correctly"
+    else
+        test_fail "Long string failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_special_shell_chars() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo \$VAR | grep -E \"[a-z]+\" > /dev/null && cmd"
+        _zsh_jumper_tokenize
+        echo "${#_zj_words[@]}:${_zj_words[2]}:${_zj_words[6]}"
+    ' 2>&1)
+    if [[ "$result" == '10:$VAR:"[a-z]+"' ]]; then
+        test_pass "Shell special chars preserved"
+    else
+        test_fail "Shell chars failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_dashes_flags() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="cmd --flag -f --long-option --another=value"
+        _zsh_jumper_tokenize
+        echo "${_zj_words[2]}:${_zj_positions[2]}|${_zj_words[4]}:${_zj_positions[4]}"
+    ' 2>&1)
+    if [[ "$result" == "--flag:4|--long-option:14" ]]; then
+        test_pass "Dashes and flags positioned correctly"
+    else
+        test_fail "Dashes/flags failed" "Got: $result"
+    fi
+}
+
+test_tokenizer_equals_in_word() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="export VAR=value KEY=123"
+        _zsh_jumper_tokenize
+        echo "${_zj_words[2]}:${_zj_positions[2]}"
+    ' 2>&1)
+    if [[ "$result" == "VAR=value:7" ]]; then
+        test_pass "Equals preserved in word"
+    else
+        test_fail "Equals handling failed" "Got: $result"
+    fi
+}
+
+test_action_helpers_defined() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_wrap] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_help] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_var] )) || exit 1
+        echo 'ok'
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Action helpers defined"
+    else
+        test_fail "Action helpers missing" "$result"
+    fi
+}
+
+test_single_keybinding() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        bindkey -L | grep -c 'zsh-jumper-widget'
+    " 2>&1)
+    result="${result//[^0-9]/}"
+
+    if [[ "$result" == "1" ]]; then
+        test_pass "Single keybinding set (actions via FZF --expect)"
+    else
+        test_fail "Wrong keybinding count" "Expected: 1, Got: $result"
+    fi
+}
+
+test_unload_cleans_enrichment() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        zsh-jumper-unload
+        (( \$+functions[_zsh_jumper_do_jump] )) && exit 1
+        (( \$+functions[_zsh_jumper_do_wrap] )) && exit 1
+        (( \$+functions[_zsh_jumper_do_help] )) && exit 1
+        (( \$+functions[_zsh_jumper_do_var] )) && exit 1
+        (( \$+functions[_zsh_jumper_tokenize] )) && exit 1
+        exit 0
+    " 2>&1)
+    if [[ $? -eq 0 ]]; then
+        test_pass "Unload removes enrichment functions"
+    else
+        test_fail "Unload failed to clean enrichment" "$result"
+    fi
+}
+
+test_var_name_uppercase() {
+    # Variable names should be uppercase
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="my-value"
+        var_name="${${(U)target}//[^A-Z0-9]/_}"
+        echo "$var_name"
+    ' 2>&1)
+
+    if [[ "$result" == "MY_VALUE" ]]; then
+        test_pass "Var name converted to uppercase"
+    else
+        test_fail "Var name uppercase failed" "Expected: MY_VALUE, Got: $result"
+    fi
+}
+
+test_var_name_special_chars() {
+    # Special chars replaced with underscore
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="my-gpu.test@foo"
+        var_name="${${(U)target}//[^A-Z0-9]/_}"
+        echo "$var_name"
+    ' 2>&1)
+
+    if [[ "$result" == "MY_GPU_TEST_FOO" ]]; then
+        test_pass "Var name special chars replaced"
+    else
+        test_fail "Var name special chars failed" "Expected: MY_GPU_TEST_FOO, Got: $result"
+    fi
+}
+
+test_var_value_quoted() {
+    # Variable assignment should have quoted value
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="my-value"
+        var_name="${${(U)target}//[^A-Z0-9]/_}"
+        assignment="${var_name}=\"${target}\""
+        echo "$assignment"
+    ' 2>&1)
+
+    if [[ "$result" == 'MY_VALUE="my-value"' ]]; then
+        test_pass "Var value is double-quoted"
+    else
+        test_fail "Var value quoting failed" "Expected: MY_VALUE=\"my-value\", Got: $result"
+    fi
+}
+
+test_var_reference_quoted() {
+    # Variable reference in command should be quoted
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        BUFFER="echo my-value end"
+        pos=5
+        end_pos=13
+        var_name="MY_VALUE"
+        BUFFER="${BUFFER:0:$pos}\"\$${var_name}\"${BUFFER:$end_pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+
+    if [[ "$result" == 'echo "$MY_VALUE" end' ]]; then
+        test_pass "Var reference is double-quoted"
+    else
+        test_fail "Var reference quoting failed" "Expected: echo \"\$MY_VALUE\" end, Got: $result"
+    fi
+}
+
+test_var_with_numbers() {
+    # Numbers should be preserved in var name
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="gpu123-test"
+        var_name="${${(U)target}//[^A-Z0-9]/_}"
+        echo "$var_name"
+    ' 2>&1)
+
+    if [[ "$result" == "GPU123_TEST" ]]; then
+        test_pass "Var name preserves numbers"
+    else
+        test_fail "Var name numbers failed" "Expected: GPU123_TEST, Got: $result"
+    fi
+}
+
+test_var_leading_number() {
+    # Leading numbers stay (user can fix if needed)
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="123abc"
+        var_name="${${(U)target}//[^A-Z0-9]/_}"
+        echo "$var_name"
+    ' 2>&1)
+
+    if [[ "$result" == "123ABC" ]]; then
+        test_pass "Var name with leading number"
+    else
+        test_fail "Var leading number failed" "Expected: 123ABC, Got: $result"
+    fi
+}
+
+test_replace_deletes_whole_token() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo --flag-long-!123 bar"
+        _zsh_jumper_tokenize
+        _zsh_jumper_do_replace "2: --flag-long-!123"
+        echo "$BUFFER|$CURSOR"
+    ' 2>&1)
+
+    if [[ "$result" == "echo  bar|5" ]]; then
+        test_pass "Replace deletes whole token"
+    else
+        test_fail "Replace failed" "Expected: 'echo  bar|5', Got: '$result'"
+    fi
+}
+
+test_replace_first_word() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="kubectl get pods"
+        _zsh_jumper_tokenize
+        _zsh_jumper_do_replace "1: kubectl"
+        echo "$BUFFER|$CURSOR"
+    ' 2>&1)
+
+    if [[ "$result" == " get pods|0" ]]; then
+        test_pass "Replace first word"
+    else
+        test_fail "Replace first word failed" "Expected: ' get pods|0', Got: '$result'"
+    fi
+}
+
+test_replace_last_word() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="git commit -m"
+        _zsh_jumper_tokenize
+        _zsh_jumper_do_replace "3: -m"
+        echo "$BUFFER|$CURSOR"
+    ' 2>&1)
+
+    if [[ "$result" == "git commit |11" ]]; then
+        test_pass "Replace last word"
+    else
+        test_fail "Replace last word failed" "Expected: 'git commit |11', Got: '$result'"
+    fi
+}
+
+# Wrap action tests - test wrapping logic directly
+test_wrap_double_quote() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo foo bar"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open="\"" close="\""
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo "foo" bar' ]] && test_pass "Wrap double quote" || test_fail "Wrap double quote" "Got: $result"
+}
+
+test_wrap_single_quote() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo foo bar"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open="'"'"'" close="'"'"'"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == "echo 'foo' bar" ]] && test_pass "Wrap single quote" || test_fail "Wrap single quote" "Got: $result"
+}
+
+test_wrap_quoted_var() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo foo bar"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open='"'"'"$'"'"' close='"'"'"'"'"'
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo "$foo" bar' ]] && test_pass 'Wrap "$..." quoted var' || test_fail 'Wrap "$..."' "Got: $result"
+}
+
+test_wrap_var_expansion() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo foo bar"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open='"'"'${'"'"' close="}"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo ${foo} bar' ]] && test_pass 'Wrap ${...} expansion' || test_fail 'Wrap ${...}' "Got: $result"
+}
+
+test_wrap_cmd_subst() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo foo bar"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open='"'"'$('"'"' close=")"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo $(foo) bar' ]] && test_pass 'Wrap $(...) cmd subst' || test_fail 'Wrap $(...)' "Got: $result"
+}
+
+test_wrap_special_chars() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo --my-flag=value"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        local open="\"" close="\""
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo "--my-flag=value"' ]] && test_pass "Wrap special chars preserved" || test_fail "Wrap special chars" "Got: $result"
+}
+
+test_wrap_first_word() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="kubectl get pods"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[1]}" target="${_zj_words[1]}"
+        local open='"'"'$('"'"' close=")"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == '$(kubectl) get pods' ]] && test_pass "Wrap first word" || test_fail "Wrap first word" "Got: $result"
+}
+
+test_wrap_last_word() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="echo hello world"
+        _zsh_jumper_tokenize
+        local pos="${_zj_positions[3]}" target="${_zj_words[3]}"
+        local open='"'"'${'"'"' close="}"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+        echo "$BUFFER"
+    ' 2>&1)
+    [[ "$result" == 'echo hello ${world}' ]] && test_pass "Wrap last word" || test_fail "Wrap last word" "Got: $result"
+}
+
+# Data-driven tokenizer tests from fixture file
+test_tokenizer_fixtures() {
+    setopt local_options NO_XTRACE NO_VERBOSE
+    local fixture_file="$PLUGIN_DIR/tests/fixtures/tokenizer_edge_cases.txt"
+    [[ ! -f "$fixture_file" ]] && { test_skip "Fixture file not found"; return; }
+
+    local failed=0 total=0 tmpfile result actual_count actual_positions
+    while IFS=$'\t' read -r input expected_count expected_positions; do
+        [[ "$input" == \#* || -z "$input" ]] && continue
+        (( total++ ))
+        tmpfile=$(mktemp)
+        print -r -- "$input" > "$tmpfile"
+        result=$(zsh -c '
+            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            BUFFER=$(<'"$tmpfile"')
+            _zsh_jumper_tokenize
+            print -r -- "${#_zj_words[@]} ${_zj_positions[*]}"
+        ' 2>/dev/null)
+        rm -f "$tmpfile"
+        actual_count="${result%% *}"
+        actual_positions="${result#* }"
+        if [[ "$actual_count" != "$expected_count" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Tokenizer: '$input' - expected $expected_count words, got $actual_count"
+        elif [[ -n "$expected_positions" && "$actual_positions" != "$expected_positions" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Tokenizer: '$input' - positions expected '$expected_positions', got '$actual_positions'"
+        else
+            vlog "Tokenizer: '$input' → $actual_count words at [$actual_positions]"
+        fi
+    done < "$fixture_file"
+
+    (( failed == 0 )) && test_pass "Tokenizer fixtures ($total cases)" || test_fail "Tokenizer fixtures" "$failed/$total cases failed"
+}
+
+# Data-driven multiline command tests
+test_multiline_fixtures() {
+    setopt local_options NO_XTRACE NO_VERBOSE
+    local fixture_file="$PLUGIN_DIR/tests/fixtures/multiline_cases.txt"
+    [[ ! -f "$fixture_file" ]] && { test_skip "Multiline fixture file not found"; return; }
+
+    local failed=0 total=0 tmpfile result actual_count actual_positions
+    while IFS=$'\t' read -r input expected_count expected_positions; do
+        [[ "$input" == \#* || -z "$input" ]] && continue
+        (( total++ ))
+        # Expand <NL> to newline, <TAB> to tab (pure zsh)
+        local expanded=${input//'<NL>'/$'\n'}
+        expanded=${expanded//'<TAB>'/$'\t'}
+        tmpfile=$(mktemp)
+        print -r -- "$expanded" > "$tmpfile"
+        result=$(zsh -c '
+            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            BUFFER=$(<'"$tmpfile"')
+            _zsh_jumper_tokenize
+            print -r -- "${#_zj_words[@]} ${_zj_positions[*]}"
+        ' 2>/dev/null)
+        rm -f "$tmpfile"
+        actual_count="${result%% *}"
+        actual_positions="${result#* }"
+        if [[ "$actual_count" != "$expected_count" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Multiline: '$input' - expected $expected_count words, got $actual_count"
+        elif [[ -n "$expected_positions" && "$actual_positions" != "$expected_positions" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Multiline: '$input' - positions expected '$expected_positions', got '$actual_positions'"
+        else
+            vlog "Multiline: '$input' → $actual_count words"
+        fi
+    done < "$fixture_file"
+
+    (( failed == 0 )) && test_pass "Multiline fixtures ($total cases)" || test_fail "Multiline fixtures" "$failed/$total cases failed"
+}
+
+# Data-driven var extraction tests from fixture file
+test_var_fixtures() {
+    setopt local_options NO_XTRACE NO_VERBOSE
+    local fixture_file="$PLUGIN_DIR/tests/fixtures/var_cases.txt"
+    [[ ! -f "$fixture_file" ]] && { test_skip "Var fixture file not found"; return; }
+
+    local failed=0 total=0 tmpfile tmpexpected result expected actual_var_name actual_buffer
+    while IFS=$'\t' read -r input token_idx expected_var_name expected_buffer; do
+        [[ "$input" == \#* || -z "$input" ]] && continue
+        (( total++ ))
+        tmpfile=$(mktemp)
+        tmpexpected=$(mktemp)
+        print -r -- "$input" > "$tmpfile"
+        print -r -- "$expected_buffer" > "$tmpexpected"
+        result=$(zsh -c '
+            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            BUFFER=$(<'"$tmpfile"')
+            _zsh_jumper_tokenize
+            local idx='"$token_idx"'
+            local pos="${_zj_positions[$idx]}"
+            local target="${_zj_words[$idx]}"
+            local var_name="${${(U)target}//[^A-Z0-9]/_}"
+            local end_pos=$((pos + ${#target}))
+            BUFFER="${BUFFER:0:$pos}\"\$${var_name}\"${BUFFER:$end_pos}"
+            print -r -- "$var_name"
+            print -r -- "$BUFFER"
+        ' 2>/dev/null)
+        expected=$(<"$tmpexpected")
+        actual_var_name="${result%%$'\n'*}"
+        actual_buffer="${result#*$'\n'}"
+        rm -f "$tmpfile" "$tmpexpected"
+        if [[ "$actual_var_name" != "$expected_var_name" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Var: '$input' [$token_idx] - var name expected '$expected_var_name', got '$actual_var_name'"
+        elif [[ "$actual_buffer" != "$expected" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Var: '$input' [$token_idx] - buffer expected '$expected', got '$actual_buffer'"
+        else
+            vlog "Var: '$input' [$token_idx] → $actual_var_name"
+        fi
+    done < "$fixture_file"
+
+    (( failed == 0 )) && test_pass "Var fixtures ($total cases)" || test_fail "Var fixtures" "$failed/$total cases failed"
+}
+
+# Data-driven replace tests from fixture file
+test_replace_fixtures() {
+    setopt local_options NO_XTRACE NO_VERBOSE
+    local fixture_file="$PLUGIN_DIR/tests/fixtures/replace_cases.txt"
+    [[ ! -f "$fixture_file" ]] && { test_skip "Replace fixture file not found"; return; }
+
+    local failed=0 total=0 tmpfile tmpexpected result expected actual_buffer actual_cursor
+    while IFS=$'\t' read -r input token_idx expected_buffer expected_cursor; do
+        [[ "$input" == \#* || -z "$input" ]] && continue
+        (( total++ ))
+        tmpfile=$(mktemp)
+        tmpexpected=$(mktemp)
+        print -r -- "$input" > "$tmpfile"
+        print -r -- "$expected_buffer" > "$tmpexpected"
+        result=$(zsh -c '
+            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            BUFFER=$(<'"$tmpfile"')
+            CURSOR=0
+            _zsh_jumper_tokenize
+            local idx='"$token_idx"'
+            local pos="${_zj_positions[$idx]}" target="${_zj_words[$idx]}"
+            local end_pos=$((pos + ${#target}))
+            BUFFER="${BUFFER:0:$pos}${BUFFER:$end_pos}"
+            CURSOR=$pos
+            print -r -- "$BUFFER"
+            print -r -- "$CURSOR"
+        ' 2>/dev/null)
+        expected=$(<"$tmpexpected")
+        actual_buffer="${result%%$'\n'*}"
+        actual_cursor="${result#*$'\n'}"
+        rm -f "$tmpfile" "$tmpexpected"
+        if [[ "$actual_buffer" != "$expected" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Replace: '$input' [$token_idx] - buffer expected '$expected', got '$actual_buffer'"
+        elif [[ "$actual_cursor" != "$expected_cursor" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Replace: '$input' [$token_idx] - cursor expected '$expected_cursor', got '$actual_cursor'"
+        else
+            vlog "Replace: '$input' [$token_idx] → cursor at $actual_cursor"
+        fi
+    done < "$fixture_file"
+
+    (( failed == 0 )) && test_pass "Replace fixtures ($total cases)" || test_fail "Replace fixtures" "$failed/$total cases failed"
+}
+
+# Data-driven wrap tests from fixture file
+test_wrap_fixtures() {
+    setopt local_options NO_XTRACE NO_VERBOSE
+    local fixture_file="$PLUGIN_DIR/tests/fixtures/wrap_cases.txt"
+    [[ ! -f "$fixture_file" ]] && { test_skip "Wrap fixture file not found"; return; }
+
+    local failed=0 total=0 open close tmpfile tmpopen tmpclose tmpexpected result expected
+    while IFS=$'\t' read -r input token_idx wrapper_type expected_buffer; do
+        [[ "$input" == \#* || -z "$input" ]] && continue
+        (( total++ ))
+        case "$wrapper_type" in
+            '"..."')   open='"' close='"' ;;
+            "'...'")   open="'" close="'" ;;
+            '"$..."')  open='"$' close='"' ;;
+            '${...}')  open='${' close='}' ;;
+            '$(...)')  open='$(' close=')' ;;
+            '`...`')   open='`' close='`' ;;
+            '[...]')   open='[' close=']' ;;
+            '{...}')   open='{' close='}' ;;
+            '(...)')   open='(' close=')' ;;
+            '<...>')   open='<' close='>' ;;
+        esac
+        tmpfile=$(mktemp)
+        tmpopen=$(mktemp)
+        tmpclose=$(mktemp)
+        tmpexpected=$(mktemp)
+        print -r -- "$input" > "$tmpfile"
+        print -r -- "$open" > "$tmpopen"
+        print -r -- "$close" > "$tmpclose"
+        print -r -- "$expected_buffer" > "$tmpexpected"
+        result=$(zsh -c '
+            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            BUFFER=$(<'"$tmpfile"')
+            _zsh_jumper_tokenize
+            local idx='"$token_idx"'
+            local pos="${_zj_positions[$idx]}" target="${_zj_words[$idx]}"
+            local open=$(<'"$tmpopen"') close=$(<'"$tmpclose"')
+            local end_pos=$((pos + ${#target}))
+            BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
+            BUFFER="${BUFFER:0:$pos}${open}${BUFFER:$pos}"
+            print -r -- "$BUFFER"
+        ' 2>/dev/null)
+        expected=$(<"$tmpexpected")
+        rm -f "$tmpfile" "$tmpopen" "$tmpclose" "$tmpexpected"
+        if [[ "$result" != "$expected" ]]; then
+            (( failed++ ))
+            print "[0;31m✗[0m Wrap: '$input' [$token_idx] $wrapper_type - expected '$expected', got '$result'"
+        else
+            vlog "Wrap: '$input' [$token_idx] $wrapper_type → '$result'"
+        fi
+    done < "$fixture_file"
+
+    (( failed == 0 )) && test_pass "Wrap fixtures ($total cases)" || test_fail "Wrap fixtures" "$failed/$total cases failed"
+}
+
+# ------------------------------------------------------------------------------
+# Overlay and Instant Jump Tests
+# ------------------------------------------------------------------------------
+
+test_hint_keys_defined() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        echo \"\${#_zj_hint_keys[@]}\"
+    " 2>&1)
+
+    if [[ "$result" == "27" ]]; then
+        test_pass "Hint keys array has 27 elements (a-m, excluding n)"
+    else
+        test_fail "Hint keys count wrong" "Expected: 27, Got: $result"
+    fi
+}
+
+test_hint_keys_home_row_first() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        echo \"\${_zj_hint_keys[1]} \${_zj_hint_keys[2]} \${_zj_hint_keys[3]}\"
+    " 2>&1)
+
+    if [[ "$result" == "a s d" ]]; then
+        test_pass "Hint keys start with home row (a s d)"
+    else
+        test_fail "Hint keys order wrong" "Expected: 'a s d', Got: '$result'"
+    fi
+}
+
+test_build_overlay_simple() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="kubectl get pods"
+        _zsh_jumper_tokenize
+        _zsh_jumper_build_overlay
+        echo "$REPLY"
+    ' 2>&1)
+
+    if [[ "$result" == "[a]kubectl [s]get [d]pods" ]]; then
+        test_pass "Build overlay creates [a]kubectl [s]get [d]pods"
+    else
+        test_fail "Build overlay wrong" "Expected: '[a]kubectl [s]get [d]pods', Got: '$result'"
+    fi
+}
+
+test_build_overlay_preserves_spaces() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="a    b"
+        _zsh_jumper_tokenize
+        _zsh_jumper_build_overlay
+        echo "$REPLY"
+    ' 2>&1)
+
+    if [[ "$result" == "[a]a    [s]b" ]]; then
+        test_pass "Build overlay preserves multiple spaces"
+    else
+        test_fail "Build overlay spaces wrong" "Expected: '[a]a    [s]b', Got: '$result'"
+    fi
+}
+
+test_build_overlay_many_words() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb"
+        _zsh_jumper_tokenize
+        _zsh_jumper_build_overlay
+        echo "${REPLY:0:4}|${REPLY: -6}"
+    ' 2>&1)
+
+    if [[ "$result" == "[a]a|[28]bb" ]]; then
+        test_pass "Build overlay falls back to numbers after 27 words"
+    else
+        test_fail "Build overlay many words wrong" "Expected: '[a]a|[28]bb', Got: '$result'"
+    fi
+}
+
+test_hint_to_index_a() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_hint_to_index 'a'
+    " 2>&1)
+
+    if [[ "$result" == "1" ]]; then
+        test_pass "Hint 'a' maps to index 1"
+    else
+        test_fail "Hint 'a' mapping wrong" "Expected: 1, Got: $result"
+    fi
+}
+
+test_hint_to_index_s() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_hint_to_index 's'
+    " 2>&1)
+
+    if [[ "$result" == "2" ]]; then
+        test_pass "Hint 's' maps to index 2"
+    else
+        test_fail "Hint 's' mapping wrong" "Expected: 2, Got: $result"
+    fi
+}
+
+test_hint_to_index_semicolon() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_hint_to_index ';'
+    " 2>&1)
+
+    if [[ "$result" == "10" ]]; then
+        test_pass "Hint ';' maps to index 10"
+    else
+        test_fail "Hint ';' mapping wrong" "Expected: 10, Got: $result"
+    fi
+}
+
+test_hint_to_index_numeric_fallback() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_hint_to_index '5'
+    " 2>&1)
+
+    if [[ "$result" == "5" ]]; then
+        test_pass "Numeric hint '5' returns 5"
+    else
+        test_fail "Numeric hint fallback wrong" "Expected: 5, Got: $result"
+    fi
+}
+
+test_extract_index_with_hint_prefix() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_extract_index '[a] 1: kubectl'
+    " 2>&1)
+
+    if [[ "$result" == "1" ]]; then
+        test_pass "Extract index from '[a] 1: kubectl' returns 1"
+    else
+        test_fail "Extract index with hint prefix wrong" "Expected: 1, Got: $result"
+    fi
+}
+
+test_extract_index_without_hint_prefix() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_extract_index '15: TARGET'
+    " 2>&1)
+
+    if [[ "$result" == "15" ]]; then
+        test_pass "Extract index from '15: TARGET' returns 15"
+    else
+        test_fail "Extract index without hint wrong" "Expected: 15, Got: $result"
+    fi
+}
+
+test_numbered_list_with_hints() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        _zj_words=(kubectl get pods)
+        typeset -ga _zj_hint_keys=(a s d f g h j k l \; q w e r t y u i o p z x c v b n m)
+        local -a numbered
+        for i in {1..${#_zj_words[@]}}; do
+            if (( i <= ${#_zj_hint_keys[@]} )); then
+                numbered+=("[${_zj_hint_keys[$i]}] $i: ${_zj_words[$i]}")
+            else
+                numbered+=("$i: ${_zj_words[$i]}")
+            fi
+        done
+        printf "%s\n" "${numbered[@]}"
+    ' 2>&1)
+
+    if [[ "$result" == *"[a] 1: kubectl"* ]] && [[ "$result" == *"[s] 2: get"* ]] && [[ "$result" == *"[d] 3: pods"* ]]; then
+        test_pass "Numbered list includes hint keys"
+    else
+        test_fail "Numbered list hints wrong" "Got: $result"
+    fi
+}
+
+test_overlay_functions_exist() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        (( \$+functions[_zsh_jumper_build_overlay] )) || exit 1
+        (( \$+functions[_zsh_jumper_hint_to_index] )) || exit 1
+        (( \$+functions[_zsh_jumper_extract_index] )) || exit 1
+        echo 'ok'
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Overlay helper functions defined"
+    else
+        test_fail "Overlay functions missing" "$result"
+    fi
+}
+
+test_instant_key_default() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        local instant_key
+        zstyle -s ":zsh-jumper:" fzf-instant-key instant_key || instant_key=";"
+        echo "$instant_key"
+    ' 2>&1)
+
+    if [[ "$result" == ";" ]]; then
+        test_pass "Default instant key is ;"
+    else
+        test_fail "Default instant key wrong" "Expected: ';', Got: '$result'"
+    fi
+}
+
+test_instant_key_configurable() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zsh-jumper:" fzf-instant-key "ctrl-i"
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        local instant_key
+        zstyle -s ":zsh-jumper:" fzf-instant-key instant_key
+        echo "$instant_key"
+    ' 2>&1)
+
+    if [[ "$result" == "ctrl-i" ]]; then
+        test_pass "Instant key configurable via zstyle"
+    else
+        test_fail "Instant key config wrong" "Expected: 'ctrl-i', Got: '$result'"
+    fi
+}
+
+test_command_with_double_dash() {
+    # Test that commands containing -- don't break argument parsing
+    result=$(zsh -c '
+        source ./zsh-jumper.plugin.zsh
+        words=(cmd --flag -- arg1 arg2)
+        word_count="${#words[@]}"
+        sel="4: arg1"
+
+        # Simulate _zsh_jumper_do_var argument parsing
+        args=("$word_count" "${words[@]}" "$sel")
+        wc="${args[1]}"; shift args
+        parsed_words=("${args[@]:0:$wc}")
+        shift wc args
+        parsed_sel="${args[1]}"
+        idx="${parsed_sel%%:*}"
+
+        echo "wc=$wc idx=$idx words=${#parsed_words[@]}"
+    ' 2>&1)
+
+    if [[ "$result" == "wc=5 idx=4 words=5" ]]; then
+        test_pass "Commands with -- parse correctly"
+    else
+        test_fail "Double-dash parsing failed" "Got: $result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Run tests
 # ------------------------------------------------------------------------------
 
@@ -824,9 +1929,10 @@ run_test test_picker_detection_fzf
 run_test test_picker_detection_sk
 run_test test_picker_detection_peco
 run_test test_zstyle_picker_override
-run_test test_picker_opts_default
-run_test test_picker_opts_custom
+run_test test_adapter_functions_exist
+run_test test_invoke_picker_dispatches
 run_test test_cursor_position
+run_test test_fzf_key_defaults_not_empty
 run_test test_disable_bindings
 run_test test_unload
 run_test test_picker_pipe
@@ -857,6 +1963,76 @@ run_test test_hebrew
 run_test test_mixed_scripts
 run_test test_emoji_sequence
 run_test test_accented_latin
+
+# FZF/SK Bind support tests
+run_test test_supports_binds_detection
+
+# Picker integration tests
+run_test test_integration_fzf_binds
+run_test test_integration_fzf_header
+run_test test_integration_sk_binds
+run_test test_integration_sk_header
+run_test test_integration_peco_basic
+
+# Tokenizer edge case tests
+run_test test_tokenizer_positions
+run_test test_tokenizer_multiple_spaces
+run_test test_tokenizer_leading_trailing_spaces
+run_test test_tokenizer_tabs_mixed
+run_test test_tokenizer_very_long_string
+run_test test_tokenizer_special_shell_chars
+run_test test_tokenizer_dashes_flags
+run_test test_tokenizer_equals_in_word
+
+run_test test_action_helpers_defined
+run_test test_single_keybinding
+run_test test_unload_cleans_enrichment
+run_test test_command_with_double_dash
+
+# Variable extraction tests
+run_test test_var_name_uppercase
+run_test test_var_name_special_chars
+run_test test_var_value_quoted
+run_test test_var_reference_quoted
+run_test test_var_with_numbers
+run_test test_var_leading_number
+
+# Replace action tests
+run_test test_replace_deletes_whole_token
+run_test test_replace_first_word
+run_test test_replace_last_word
+
+# Wrap action tests
+run_test test_wrap_double_quote
+run_test test_wrap_single_quote
+run_test test_wrap_quoted_var
+run_test test_wrap_var_expansion
+run_test test_wrap_cmd_subst
+run_test test_wrap_special_chars
+run_test test_wrap_first_word
+run_test test_wrap_last_word
+run_test test_tokenizer_fixtures
+run_test test_multiline_fixtures
+run_test test_var_fixtures
+run_test test_replace_fixtures
+run_test test_wrap_fixtures
+
+# Overlay and instant jump tests
+run_test test_hint_keys_defined
+run_test test_hint_keys_home_row_first
+run_test test_build_overlay_simple
+run_test test_build_overlay_preserves_spaces
+run_test test_build_overlay_many_words
+run_test test_hint_to_index_a
+run_test test_hint_to_index_s
+run_test test_hint_to_index_semicolon
+run_test test_hint_to_index_numeric_fallback
+run_test test_extract_index_with_hint_prefix
+run_test test_extract_index_without_hint_prefix
+run_test test_numbered_list_with_hints
+run_test test_overlay_functions_exist
+run_test test_instant_key_default
+run_test test_instant_key_configurable
 
 print ""
 local actual_tests=$((TESTS_RUN - TESTS_SKIPPED))

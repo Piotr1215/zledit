@@ -9,26 +9,36 @@ $ kubectl get pods -n kube-system --output wide
                     ▲
               [Ctrl+X /]
                     │
-         ┌──────────┴──────────┐
-         │      jump>          │
-         │  1: kubectl         │
-         │  2: get             │
-         │> 3: pods            │
-         │  4: -n              │
-         │  5: kube-system     │
-         │  6: --output        │
-         │  7: wide            │
-         └─────────────────────┘
+  ┌─────────────────┴─────────────────────────────────────┐
+  │ [a]kubectl [s]get [d]pods [f]-n [g]kube-system ...    │  ← overlay hints
+  ├───────────────────────────────────────────────────────┤
+  │      jump>                                            │
+  │  [a] 1: kubectl                                       │
+  │  [s] 2: get                                           │
+  │> [d] 3: pods                                          │
+  │  [f] 4: -n                                            │
+  │  [g] 5: kube-system                                   │
+  │  [h] 6: --output                                      │
+  │  [j] 7: wide                                          │
+  └───────────────────────────────────────────────────────┘
 ```
 
-Words are numbered to ensure accurate cursor placement. This prevents issues where short flags like `-u` might match inside longer options like `--user`.
+Both numbered indices AND letter hints (a, s, d, f...) are shown. The overlay on the command line shows `[a]kubectl [s]get [d]pods` so you can see which letter jumps where without looking away.
+
+Press `;` in the picker to switch to **instant mode**: just press a letter key (a, s, d...) to jump immediately.
 
 ## Features
 
 - **Multiple picker support**: fzf, fzf-tmux, sk (skim), peco, percol
 - **Auto-detection**: Prefers fzf-tmux when in tmux, falls back to available picker
+- **Overlay hints**: EasyMotion-style `[a] [s] [d]` labels on command line (fzf/sk)
+- **Instant jump**: Press `;` then a letter to jump without fuzzy searching
 - **Configurable**: Custom keybindings, picker options via zstyle
 - **Fast**: ~0.2ms load time (see [Performance](#performance))
+- **Wrap/Surround**: Wrap tokens in quotes, brackets, or command substitution
+- **Help integration**: Show help for selected flags or commands
+- **Variable extraction**: Convert tokens to shell variables
+- **Path preview**: Preview file/directory contents in fzf panel
 
 ## Requirements
 
@@ -83,7 +93,47 @@ source /path/to/zsh-jumper/zsh-jumper.plugin.zsh
 
 Press `Ctrl+X /` (default) on a command line with multiple words. Select a word to jump cursor there.
 
-**Tip**: After jumping, use `Alt+D` to delete the word, or `Ctrl+W` to delete backward - useful for quick replacements.
+### FZF Actions (inside picker)
+
+With FZF, additional actions available via key combos (shown in header):
+
+| Key | Action |
+|-----|--------|
+| `Enter` | Jump to selected token |
+| `Ctrl+S` | Wrap token in `"..."`, `'...'`, `$(...)`, etc. |
+| `Ctrl+H` | Show `--help` for selected flag/command |
+| `Ctrl+E` | Extract token to `UPPERCASE` variable (uses push-line) |
+| `Ctrl+R` | Replace token (delete and position cursor for typing with tab completion) |
+| `;` | Switch to instant mode (press a letter to jump immediately) |
+
+**Tip**: `Ctrl+R` deletes the token and leaves cursor in place - you get full zsh tab completion for the replacement text.
+
+**Instant mode**: Press `;` while in the picker, then press a hint letter (a, s, d, f...) to jump directly to that word. The overlay on your command line shows which letter maps to which word.
+
+Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in the command. Special characters become underscores.
+
+**Custom FZF keys** (if defaults conflict with your setup):
+```zsh
+zstyle ':zsh-jumper:' fzf-wrap-key 'ctrl-s'
+zstyle ':zsh-jumper:' fzf-help-key 'ctrl-h'
+zstyle ':zsh-jumper:' fzf-var-key 'ctrl-e'
+zstyle ':zsh-jumper:' fzf-replace-key 'ctrl-r'
+zstyle ':zsh-jumper:' fzf-instant-key ';'    # key to enter instant mode
+```
+
+**Disable overlay hints**:
+```zsh
+zstyle ':zsh-jumper:' overlay off
+```
+
+### Path Preview (FZF only)
+
+File/directory tokens show a preview panel (`bat` with fallback to `head`). Extracts paths from `VAR=/path` format.
+
+```zsh
+zstyle ':zsh-jumper:' preview off              # disable
+zstyle ':zsh-jumper:' preview-window 'bottom:40%'  # position
+```
 
 ### Multiline Commands
 
@@ -149,6 +199,33 @@ num  calls                time            self            name
 -------------------------------------------------------------------------------
  1)    1           0.23     0.23  100.00%  zsh-jumper-setup-bindings
 ```
+
+## Architecture
+
+Core logic is pure zsh - external pickers (fzf/skim/peco) only handle UI.
+
+```
+tokenizer (pure)  →  actions (pure)  →  picker (external)
+     ↓                    ↓
+ _zj_words[]        jump/wrap/var
+ _zj_positions[]    (O(1) lookup)
+```
+
+The single-pass tokenizer records word positions during parsing. Actions access `_zj_positions[$idx]` directly for O(1) lookup.
+
+See [docs/design.md](docs/design.md) for engineering details.
+
+## Testing
+
+```bash
+zsh tests/test_plugin.zsh
+```
+
+Tests run in isolated subshells to ensure clean state. Covers tokenizer edge cases (unicode, special chars, long buffers), action behavior, and integration.
+
+## Credits
+
+The EasyMotion-style overlay hints feature was inspired by [@DehanLUO](https://github.com/DehanLUO)'s thoughtful [feature suggestion](https://github.com/Piotr1215/zsh-jumper/issues/4) and their [zsh-easymotion](https://github.com/DehanLUO/.config/blob/main/zsh/zsh-easymotion/zsh-easymotion.zsh) implementation.
 
 ## License
 

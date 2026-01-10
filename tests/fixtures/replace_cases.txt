@@ -1,0 +1,34 @@
+# Replace action test cases
+# Format: input<TAB>token_idx<TAB>expected_buffer<TAB>expected_cursor
+# TAB-separated to allow special characters
+
+# Basic replace
+echo foo bar	2	echo  bar	5
+hello world	1	 world	0
+
+# Replace with multiple spaces
+echo    foo     bar	2	echo         bar	8
+
+# Replace first word
+kubectl get pods	1	 get pods	0
+
+# Replace last word
+echo hello world	3	echo hello 	11
+
+# Replace middle word
+a b c d e	3	a b  d e	4
+
+# Special characters preserved around replaced token
+echo --flag=value next	2	echo  next	5
+"quoted" rest	1	 rest	0
+
+# Emojis
+🚀 launch pad	2	🚀  pad	2
+echo 👋 world	2	echo  world	5
+
+# Pipes and redirects (removing pipe leaves spaces on both sides)
+cat | grep	2	cat  grep	4
+a | b | c	3	a |  | c	4
+
+# Long tokens
+echo superlongwordwithlotsofcharacters end	2	echo  end	5
