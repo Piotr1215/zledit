@@ -13,17 +13,17 @@ $ kubectl get pods -n kube-system --output wide
   │ [a]kubectl [s]get [d]pods [f]-n [g]kube-system ...    │  ← overlay hints
   ├───────────────────────────────────────────────────────┤
   │      jump>                                            │
-  │  [a] 1: kubectl                                       │
-  │  [s] 2: get                                           │
-  │> [d] 3: pods                                          │
-  │  [f] 4: -n                                            │
-  │  [g] 5: kube-system                                   │
-  │  [h] 6: --output                                      │
-  │  [j] 7: wide                                          │
+  │    1: kubectl                                         │
+  │    2: get                                             │
+  │>   3: pods                                            │
+  │    4: -n                                              │
+  │    5: kube-system                                     │
+  │    6: --output                                        │
+  │    7: wide                                            │
   └───────────────────────────────────────────────────────┘
 ```
 
-Both numbered indices AND letter hints (a, s, d, f...) are shown. The overlay on the command line shows `[a]kubectl [s]get [d]pods` so you can see which letter jumps where without looking away.
+The overlay on the command line shows `[a]kubectl [s]get [d]pods` - letter hints for instant jump. The picker shows numbered items for fuzzy search.
 
 Press `;` to enter **instant mode**: then press a letter key (a, s, d...) to jump immediately to that word.
 
@@ -31,7 +31,7 @@ Press `;` to enter **instant mode**: then press a letter key (a, s, d...) to jum
 
 - **Multiple picker support**: fzf, fzf-tmux, sk (skim), peco, percol
 - **Auto-detection**: Prefers fzf-tmux when in tmux, falls back to available picker
-- **Overlay hints**: EasyMotion-style `[a] [s] [d]` labels on command line (fzf/sk)
+- **Overlay hints**: EasyMotion-style `[a] [s] [d]` labels on command line for instant jump
 - **Instant jump**: Press `;` then a letter to jump without fuzzy searching
 - **Configurable**: Custom keybindings, picker options via zstyle
 - **Fast**: ~0.2ms load time (see [Performance](#performance))
@@ -180,6 +180,12 @@ zstyle ':zsh-jumper:' disable-bindings yes
 bindkey '^X^J' zsh-jumper-widget
 ```
 
+**List registered config:**
+
+```bash
+zsh-jumper-list  # shows config paths, actions, previewers
+```
+
 ## Picker Priority
 
 1. Explicit `zstyle ':zsh-jumper:' picker`
@@ -214,6 +220,32 @@ tokenizer (pure)  →  actions (pure)  →  picker (external)
 The single-pass tokenizer records word positions during parsing. Actions access `_zj_positions[$idx]` directly for O(1) lookup.
 
 See [docs/design.md](docs/design.md) for engineering details.
+
+## Extensibility (Advanced)
+
+The plugin works out of the box with built-in actions. For power users who want custom behavior, extensibility is opt-in via TOML config:
+
+```zsh
+zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
+```
+
+```toml
+# Custom previewer for URLs
+[[previewers]]
+pattern = '^https?://'
+description = 'URL preview'
+script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+
+# Custom action bound to Ctrl+U
+[[actions]]
+binding = 'ctrl-u'
+description = 'upper'
+script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+```
+
+User-defined actions override built-in defaults when bindings collide.
+
+See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts, and [docs/design.md](docs/design.md) for the technical reference.
 
 ## Testing
 

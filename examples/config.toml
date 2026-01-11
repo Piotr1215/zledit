@@ -1,0 +1,25 @@
+# zsh-jumper extensibility configuration
+# Copy to ~/.config/zsh-jumper/config.toml
+# Enable with: zstyle ':zsh-jumper:' config '~/.config/zsh-jumper/config.toml'
+
+# Custom previewers - match tokens by pattern
+[[previewers]]
+pattern = '^https?://'
+description = 'URL preview'
+script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+
+[[previewers]]
+pattern = '\.(json|yaml|yml)$'
+description = 'Structured data'
+script = '/usr/bin/cat'
+
+# Custom actions - extend the default actions
+[[actions]]
+binding = 'ctrl-u'
+description = 'upper'
+script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+
+[[actions]]
+binding = 'ctrl-l'
+description = 'lower'
+script = '~/.config/zsh-jumper/scripts/lowercase.sh'

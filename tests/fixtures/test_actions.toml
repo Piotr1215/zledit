@@ -1,0 +1,10 @@
+# Test actions config
+[[actions]]
+binding = 'ctrl-y'
+description = 'uppercase'
+script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+
+[[actions]]
+binding = 'ctrl-d'
+description = 'delete'
+script = '/tmp/zsh-jumper-test/delete.sh'
