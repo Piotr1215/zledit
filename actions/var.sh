@@ -36,7 +36,7 @@ new_buffer="${ZJ_BUFFER:0:$pos}\"\$${var_name}\"${ZJ_BUFFER:$end_pos}"
 # For the assignment, use the original base value (unquoted content)
 # Escape double quotes in base for assignment
 escaped_base="${base//\"/\\\"}"
-pushed_line="${var_name}=\"${escaped_base}\""
+pushed_line="export ${var_name}=\"${escaped_base}\""
 
 # Output in push-line format
 echo "$new_buffer"

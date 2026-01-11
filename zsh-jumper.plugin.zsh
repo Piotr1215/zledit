@@ -406,7 +406,14 @@ _zsh_jumper_build_preview_cmd() {
     # Simple approach: use external script to avoid quoting hell
     local script="${ZshJumper[dir]}/preview.sh"
     if [[ -x "$script" ]]; then
-        REPLY="$script {}"
+        # Inline env vars for fzf-tmux compatibility (tmux panes don't inherit exports)
+        local env_prefix=""
+        if (( ${#_zj_previewer_patterns[@]} > 0 )); then
+            local patterns="${(pj:\n:)_zj_previewer_patterns}"
+            local scripts="${(pj:\n:)_zj_previewer_scripts}"
+            env_prefix="ZJ_PREVIEWER_PATTERNS=${(qq)patterns} ZJ_PREVIEWER_SCRIPTS=${(qq)scripts} "
+        fi
+        REPLY="${env_prefix}$script {}"
     else
         # Fallback inline preview (no custom previewers)
         REPLY='t="{}"; t="${t#*: }"; t="${t//\"/}"; [ -d "$t" ] && ls -la "$t" 2>/dev/null || [ -f "$t" ] && head -30 "$t" 2>/dev/null'
@@ -503,18 +510,9 @@ zsh-jumper-widget() {
         zle -R
     fi
 
-    # Export previewer config for preview.sh (subprocess)
-    if (( ${#_zj_previewer_patterns[@]} > 0 )); then
-        export ZJ_PREVIEWER_PATTERNS="${(pj:\n:)_zj_previewer_patterns}"
-        export ZJ_PREVIEWER_SCRIPTS="${(pj:\n:)_zj_previewer_scripts}"
-    fi
-
     # Invoke picker
     zle -I
     printf '%s\n' "${numbered[@]}" | _zsh_jumper_invoke_picker "$picker" "jump> " "$header" "$binds" "${preview_args[@]}"
-
-    # Clean up exports
-    unset ZJ_PREVIEWER_PATTERNS ZJ_PREVIEWER_SCRIPTS
 
     # Restore original buffer and clear highlights
     region_highlight=()
