@@ -123,7 +123,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
-          gistID: ${{ vars.PERF_GIST_ID }}
+          gistID: ${{ secrets.PERF_GIST_ID }}
           filename: zsh-jumper-load.json
           label: load
           message: ${{ steps.perf.outputs.load_ms }}ms
@@ -133,7 +133,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
-          gistID: ${{ vars.PERF_GIST_ID }}
+          gistID: ${{ secrets.PERF_GIST_ID }}
           filename: zsh-jumper-tokenize.json
           label: tokenize 100x
           message: ${{ steps.perf.outputs.tok_ms }}ms
@@ -143,7 +143,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_TOKEN }}
-          gistID: ${{ vars.PERF_GIST_ID }}
+          gistID: ${{ secrets.PERF_GIST_ID }}
           filename: zsh-jumper-memory.json
           label: memory
           message: ${{ steps.perf.outputs.mem_kb }}KB
