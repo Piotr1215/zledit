@@ -1250,6 +1250,23 @@ test_var_leading_number() {
     fi
 }
 
+test_var_escapes_quotes() {
+    # Quotes in target should be escaped in assignment
+    local result
+    result=$(zsh -c '
+        emulate -L zsh
+        target="foo\"bar"
+        escaped="${target//\"/\\\"}"
+        echo "VAR=\"${escaped}\""
+    ' 2>&1)
+
+    if [[ "$result" == 'VAR="foo\"bar"' ]]; then
+        test_pass "Var escapes quotes in assignment"
+    else
+        test_fail "Var quote escaping failed" "Expected: VAR=\"foo\\\"bar\", Got: $result"
+    fi
+}
+
 test_replace_deletes_whole_token() {
     local result
     result=$(zsh -c '
@@ -1659,10 +1676,10 @@ test_hint_keys_defined() {
         echo \"\${#_zj_hint_keys[@]}\"
     " 2>&1)
 
-    if [[ "$result" == "27" ]]; then
-        test_pass "Hint keys array has 27 elements (a-m, excluding n)"
+    if [[ "$result" == "26" ]]; then
+        test_pass "Hint keys array has 26 elements (a-z, excluding semicolon)"
     else
-        test_fail "Hint keys count wrong" "Expected: 27, Got: $result"
+        test_fail "Hint keys count wrong" "Expected: 26, Got: $result"
     fi
 }
 
@@ -1725,9 +1742,25 @@ test_build_overlay_many_words() {
     ' 2>&1)
 
     if [[ "$result" == "[a]a|[28]bb" ]]; then
-        test_pass "Build overlay falls back to numbers after 27 words"
+        test_pass "Build overlay falls back to numbers after 26 words"
     else
         test_fail "Build overlay many words wrong" "Expected: '[a]a|[28]bb', Got: '$result'"
+    fi
+}
+
+test_highlight_multidigit_hints() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        BUFFER="[a]word [27]another [123]third"
+        _zsh_jumper_highlight_hints
+        echo "${#region_highlight[@]}"
+    ' 2>&1)
+
+    if [[ "$result" == "3" ]]; then
+        test_pass "Highlight matches single-char and multi-digit hints"
+    else
+        test_fail "Highlight multi-digit wrong" "Expected: 3 highlights, Got: $result"
     fi
 }
 
@@ -1759,17 +1792,17 @@ test_hint_to_index_s() {
     fi
 }
 
-test_hint_to_index_semicolon() {
+test_hint_to_index_q() {
     local result
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_hint_to_index ';'
+        _zsh_jumper_hint_to_index 'q'
     " 2>&1)
 
     if [[ "$result" == "10" ]]; then
-        test_pass "Hint ';' maps to index 10"
+        test_pass "Hint 'q' maps to index 10"
     else
-        test_fail "Hint ';' mapping wrong" "Expected: 10, Got: $result"
+        test_fail "Hint 'q' mapping wrong" "Expected: 10, Got: $result"
     fi
 }
 
@@ -1815,12 +1848,25 @@ test_extract_index_without_hint_prefix() {
     fi
 }
 
+test_extract_index_multidigit_hint() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_extract_index '[123] 45: word'
+    " 2>&1)
+
+    if [[ "$result" == "45" ]]; then
+        test_pass "Extract index from '[123] 45: word' returns 45"
+    else
+        test_fail "Extract multidigit hint wrong" "Expected: 45, Got: $result"
+    fi
+}
+
 test_numbered_list_with_hints() {
     local result
     result=$(zsh -c '
         source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
         _zj_words=(kubectl get pods)
-        typeset -ga _zj_hint_keys=(a s d f g h j k l \; q w e r t y u i o p z x c v b n m)
         local -a numbered
         for i in {1..${#_zj_words[@]}}; do
             if (( i <= ${#_zj_hint_keys[@]} )); then
@@ -1856,13 +1902,56 @@ test_overlay_functions_exist() {
     fi
 }
 
+test_preview_function_strips_prefix() {
+    # Test that _zsh_jumper_preview strips "N: " prefix and handles paths
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        # Create a temp file to preview
+        tmpfile=$(mktemp)
+        echo "test content" > "$tmpfile"
+        # Call preview with fzf-style input
+        output=$(_zsh_jumper_preview "1: $tmpfile")
+        rm "$tmpfile"
+        # Strip ANSI codes (bat adds colors)
+        output="${output//\x1b\[*m/}"
+        # Strip line number prefix from bat (e.g., "   1 ")
+        output="${output##*[0-9] }"
+        [[ "$output" == *"test content"* ]] && echo "ok" || echo "got: $output"
+    ' 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Preview function strips prefix and shows file content"
+    else
+        test_fail "Preview function failed" "$result"
+    fi
+}
+
+test_preview_handles_var_format() {
+    # Test that _zsh_jumper_preview extracts value from VAR=value format
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        tmpdir=$(mktemp -d)
+        # Input like: "1: HOME=/tmp/xxx"
+        output=$(_zsh_jumper_preview "1: HOME=$tmpdir")
+        rmdir "$tmpdir"
+        # Should show ls of the value path
+        [[ -n "$output" ]] && echo "ok" || echo "empty"
+    ' 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Preview function handles VAR=value format"
+    else
+        test_fail "Preview VAR format failed" "$result"
+    fi
+}
+
 test_instant_key_default() {
     local result
     result=$(zsh -c '
         source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        local instant_key
-        zstyle -s ":zsh-jumper:" fzf-instant-key instant_key || instant_key=";"
-        echo "$instant_key"
+        echo "${ZshJumper[instant-key]}"
     ' 2>&1)
 
     if [[ "$result" == ";" ]]; then
@@ -1877,9 +1966,7 @@ test_instant_key_configurable() {
     result=$(zsh -c '
         zstyle ":zsh-jumper:" fzf-instant-key "ctrl-i"
         source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        local instant_key
-        zstyle -s ":zsh-jumper:" fzf-instant-key instant_key
-        echo "$instant_key"
+        echo "${ZshJumper[instant-key]}"
     ' 2>&1)
 
     if [[ "$result" == "ctrl-i" ]]; then
@@ -1996,6 +2083,7 @@ run_test test_var_value_quoted
 run_test test_var_reference_quoted
 run_test test_var_with_numbers
 run_test test_var_leading_number
+run_test test_var_escapes_quotes
 
 # Replace action tests
 run_test test_replace_deletes_whole_token
@@ -2023,14 +2111,18 @@ run_test test_hint_keys_home_row_first
 run_test test_build_overlay_simple
 run_test test_build_overlay_preserves_spaces
 run_test test_build_overlay_many_words
+run_test test_highlight_multidigit_hints
 run_test test_hint_to_index_a
 run_test test_hint_to_index_s
-run_test test_hint_to_index_semicolon
+run_test test_hint_to_index_q
 run_test test_hint_to_index_numeric_fallback
 run_test test_extract_index_with_hint_prefix
 run_test test_extract_index_without_hint_prefix
+run_test test_extract_index_multidigit_hint
 run_test test_numbered_list_with_hints
 run_test test_overlay_functions_exist
+run_test test_preview_function_strips_prefix
+run_test test_preview_handles_var_format
 run_test test_instant_key_default
 run_test test_instant_key_configurable
 

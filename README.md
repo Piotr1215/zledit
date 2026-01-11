@@ -25,7 +25,7 @@ $ kubectl get pods -n kube-system --output wide
 
 Both numbered indices AND letter hints (a, s, d, f...) are shown. The overlay on the command line shows `[a]kubectl [s]get [d]pods` so you can see which letter jumps where without looking away.
 
-Press `;` in the picker to switch to **instant mode**: just press a letter key (a, s, d...) to jump immediately.
+Press `;` to enter **instant mode**: then press a letter key (a, s, d...) to jump immediately to that word.
 
 ## Features
 
@@ -104,7 +104,7 @@ With FZF, additional actions available via key combos (shown in header):
 | `Ctrl+H` | Show `--help` for selected flag/command |
 | `Ctrl+E` | Extract token to `UPPERCASE` variable (uses push-line) |
 | `Ctrl+R` | Replace token (delete and position cursor for typing with tab completion) |
-| `;` | Switch to instant mode (press a letter to jump immediately) |
+| `;` | Enter instant mode (then press a-z to jump) |
 
 **Tip**: `Ctrl+R` deletes the token and leaves cursor in place - you get full zsh tab completion for the replacement text.
 
