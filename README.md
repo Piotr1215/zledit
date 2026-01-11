@@ -113,6 +113,8 @@ With FZF, additional actions available via key combos (shown in header):
 
 Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in the command. Special characters become underscores.
 
+**Complex edits**: For heavy multiline editing, `Ctrl+X Ctrl+E` (edit in `$EDITOR`) still shines. zsh-jumper is for quick navigation and token manipulation.
+
 **Custom FZF keys** (if defaults conflict with your setup):
 ```zsh
 zstyle ':zsh-jumper:' fzf-wrap-key 'ctrl-s'
