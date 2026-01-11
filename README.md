@@ -1,8 +1,8 @@
 # zsh-jumper
 
-![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-load.json)
-![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-tokenize.json)
-![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-memory.json)
+[![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-load.json)](#metrics)
+[![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-tokenize.json)](#metrics)
+[![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-memory.json)](#metrics)
 
 Jump to any word on the current command line via fuzzy picker.
 
@@ -222,6 +222,18 @@ tokenizer (pure)  →  actions (pure)  →  picker (external)
 The single-pass tokenizer records word positions during parsing. Actions access `_zj_positions[$idx]` directly for O(1) lookup.
 
 See [docs/design.md](docs/design.md) for engineering details.
+
+## Metrics
+
+CI measures and enforces thresholds on every commit:
+
+| Metric | What it measures | Threshold |
+|--------|------------------|-----------|
+| **Load** | Time to source the plugin | < 200ms |
+| **Parse** | Tokenize a 10-word command 100× | < 150ms |
+| **Leak** | Memory delta after 10 load/unload cycles | < 400KB |
+
+**Leak** checks for memory that isn't freed on `zsh-jumper-unload`. A 5-cycle warmup runs first (zsh internals allocate once), then 10 more cycles. Growth beyond 400KB fails CI.
 
 ## Extensibility (Advanced)
 
