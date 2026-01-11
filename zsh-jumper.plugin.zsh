@@ -692,6 +692,28 @@ zsh-jumper-setup-bindings() {
 zsh-jumper-setup-bindings
 
 # ------------------------------------------------------------------------------
+# List registered actions/previewers
+# ------------------------------------------------------------------------------
+
+zsh-jumper-list() {
+    emulate -L zsh
+    local i val
+    print "Config:"
+    print "  plugin:  ${ZshJumper[dir]}"
+    zstyle -s ':zsh-jumper:' config val && print "  config:  $val"
+    print "  picker:  ${ZshJumper[picker]}"
+    print "  binding: $(bindkey | grep zsh-jumper-widget | awk '{print $1}')"
+    print "\nActions:"
+    for i in {1..${#_zj_action_bindings[@]}}; do
+        printf "  %-10s %-10s %s\n" "${_zj_action_bindings[$i]}" "${_zj_action_descriptions[$i]}" "${_zj_action_scripts[$i]}"
+    done
+    print "\nPreviewers:"
+    for i in {1..${#_zj_previewer_patterns[@]}}; do
+        printf "  %-12s %s\n" "${_zj_previewer_descriptions[$i]}" "${_zj_previewer_scripts[$i]}"
+    done
+}
+
+# ------------------------------------------------------------------------------
 # Unload (for plugin managers like zinit)
 # ------------------------------------------------------------------------------
 
@@ -711,7 +733,7 @@ zsh-jumper-unload() {
                _zsh_jumper_build_overlay _zsh_jumper_hint_to_index \
                _zsh_jumper_build_preview_cmd \
                _zsh_jumper_parse_toml _zsh_jumper_save_toml_item \
-               zsh-jumper-setup-bindings zsh-jumper-unload 2>/dev/null
+               zsh-jumper-setup-bindings zsh-jumper-list zsh-jumper-unload 2>/dev/null
 
     unset '_zj_words' '_zj_positions' '_zj_result_key' '_zj_result_selection' \
           '_zj_invoke_prompt' '_zj_invoke_header' '_zj_invoke_binds' \

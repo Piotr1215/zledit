@@ -180,6 +180,12 @@ zstyle ':zsh-jumper:' disable-bindings yes
 bindkey '^X^J' zsh-jumper-widget
 ```
 
+**List registered config:**
+
+```bash
+zsh-jumper-list  # shows config paths, actions, previewers
+```
+
 ## Picker Priority
 
 1. Explicit `zstyle ':zsh-jumper:' picker`
