@@ -1851,68 +1851,85 @@ test_hint_to_index_numeric_fallback() {
     fi
 }
 
-test_extract_index_with_hint_prefix() {
+test_extract_index_letter_hint() {
     local result
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index '[a] 1: kubectl'
+        _zsh_jumper_extract_index 'a: kubectl'
     " 2>&1)
 
     if [[ "$result" == "1" ]]; then
-        test_pass "Extract index from '[a] 1: kubectl' returns 1"
+        test_pass "Extract index from 'a: kubectl' returns 1"
     else
-        test_fail "Extract index with hint prefix wrong" "Expected: 1, Got: $result"
+        test_fail "Extract index letter hint wrong" "Expected: 1, Got: $result"
     fi
 }
 
-test_extract_index_without_hint_prefix() {
+test_extract_index_letter_s() {
     local result
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index '15: TARGET'
+        _zsh_jumper_extract_index 's: get'
     " 2>&1)
 
-    if [[ "$result" == "15" ]]; then
-        test_pass "Extract index from '15: TARGET' returns 15"
+    if [[ "$result" == "2" ]]; then
+        test_pass "Extract index from 's: get' returns 2"
     else
-        test_fail "Extract index without hint wrong" "Expected: 15, Got: $result"
+        test_fail "Extract index letter s wrong" "Expected: 2, Got: $result"
     fi
 }
 
-test_extract_index_multidigit_hint() {
+test_extract_index_number() {
     local result
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index '[123] 45: word'
+        _zsh_jumper_extract_index '27: word'
     " 2>&1)
 
-    if [[ "$result" == "45" ]]; then
-        test_pass "Extract index from '[123] 45: word' returns 45"
+    if [[ "$result" == "27" ]]; then
+        test_pass "Extract index from '27: word' returns 27"
     else
-        test_fail "Extract multidigit hint wrong" "Expected: 45, Got: $result"
+        test_fail "Extract index number wrong" "Expected: 27, Got: $result"
     fi
 }
 
-test_numbered_list_with_hints() {
+test_numbered_list_format() {
     local result
     result=$(zsh -c '
         source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
         _zj_words=(kubectl get pods)
         local -a numbered
         for i in {1..${#_zj_words[@]}}; do
-            if (( i <= ${#_zj_hint_keys[@]} )); then
-                numbered+=("[${_zj_hint_keys[$i]}] $i: ${_zj_words[$i]}")
-            else
-                numbered+=("$i: ${_zj_words[$i]}")
-            fi
+            numbered+=("$i: ${_zj_words[$i]}")
         done
         printf "%s\n" "${numbered[@]}"
     ' 2>&1)
 
-    if [[ "$result" == *"[a] 1: kubectl"* ]] && [[ "$result" == *"[s] 2: get"* ]] && [[ "$result" == *"[d] 3: pods"* ]]; then
-        test_pass "Numbered list includes hint keys"
+    # Initial list uses numbers only (letters appear after instant-key)
+    if [[ "$result" == *"1: kubectl"* ]] && [[ "$result" == *"2: get"* ]] && [[ "$result" == *"3: pods"* ]]; then
+        test_pass "Numbered list uses clean format"
     else
-        test_fail "Numbered list hints wrong" "Got: $result"
+        test_fail "Numbered list format wrong" "Got: $result"
+    fi
+}
+
+test_lettered_list_format() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        _zj_words=(kubectl get pods)
+        local -a lettered
+        for i in {1..${#_zj_words[@]}}; do
+            lettered+=("${_zj_hint_keys[$i]}: ${_zj_words[$i]}")
+        done
+        printf "%s\n" "${lettered[@]}"
+    ' 2>&1)
+
+    # Lettered list shown after instant-key press
+    if [[ "$result" == *"a: kubectl"* ]] && [[ "$result" == *"s: get"* ]] && [[ "$result" == *"d: pods"* ]]; then
+        test_pass "Lettered list uses hint format"
+    else
+        test_fail "Lettered list format wrong" "Got: $result"
     fi
 }
 
@@ -2361,10 +2378,11 @@ run_test test_hint_to_index_a
 run_test test_hint_to_index_s
 run_test test_hint_to_index_q
 run_test test_hint_to_index_numeric_fallback
-run_test test_extract_index_with_hint_prefix
-run_test test_extract_index_without_hint_prefix
-run_test test_extract_index_multidigit_hint
-run_test test_numbered_list_with_hints
+run_test test_extract_index_letter_hint
+run_test test_extract_index_letter_s
+run_test test_extract_index_number
+run_test test_numbered_list_format
+run_test test_lettered_list_format
 run_test test_overlay_functions_exist
 run_test test_instant_key_default
 run_test test_instant_key_configurable

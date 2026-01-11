@@ -421,16 +421,11 @@ zsh-jumper-widget() {
     _zsh_jumper_tokenize
     [[ ${#_zj_words[@]} -eq 0 ]] && return 0
 
-    # Build numbered list with hint keys
+    # Build numbered list for fzf (letters shown via overlay after instant-key)
     local -a numbered
-    local i hint
+    local i
     for i in {1..${#_zj_words[@]}}; do
-        if (( i <= ${#_zj_hint_keys[@]} )); then
-            hint="${_zj_hint_keys[$i]}"
-            numbered+=("[${hint}] $i: ${_zj_words[$i]}")
-        else
-            numbered+=("$i: ${_zj_words[$i]}")
-        fi
+        numbered+=("$i: ${_zj_words[$i]}")
     done
 
     # Use pre-loaded config from ZshJumper array (no zstyle reads during widget)
@@ -472,7 +467,7 @@ zsh-jumper-widget() {
         done
 
         binds+="$hint_binds"
-        # Start with letter keys unbound; instant-key rebinds them
+        # Letter keys unbound initially; instant-key rebinds them for direct jump
         binds+=",start:unbind($unbinds)"
         binds+=",${ik}:rebind($rebinds)"
 
@@ -507,7 +502,7 @@ zsh-jumper-widget() {
         local hint_char="${_zj_result_key#hint-}"
         local hint_idx="$(_zsh_jumper_hint_to_index "$hint_char")"
         if [[ -n "$hint_idx" ]] && (( hint_idx >= 1 && hint_idx <= ${#_zj_words[@]} )); then
-            _zsh_jumper_do_jump "[${hint_char}] ${hint_idx}: ${_zj_words[$hint_idx]}"
+            _zsh_jumper_do_jump "${hint_idx}: ${_zj_words[$hint_idx]}"
         fi
         zle reset-prompt
         return 0
@@ -537,14 +532,18 @@ zsh-jumper-widget() {
 # Actions
 # ------------------------------------------------------------------------------
 
-# Extract index from selection format: "[a] 1: word" or "[123] 1: word" or "1: word"
+# Extract index from selection format: "a: word" or "123: word"
+# Returns numeric index (1-based)
 _zsh_jumper_extract_index() {
-    local sel="$1"
-    # Strip hint prefix if present: "[...] N: word" -> "N: word"
-    # Uses shortest match (#) to strip first [...] followed by space
-    sel="${sel#\[*\] }"
-    # Extract number before colon
-    echo "${sel%%:*}"
+    local sel="$1" key
+    # Extract key before colon
+    key="${sel%%:*}"
+    # If it's a single letter, convert to index
+    if [[ "$key" =~ ^[a-z]$ ]]; then
+        _zsh_jumper_hint_to_index "$key"
+    else
+        echo "$key"
+    fi
 }
 
 _zsh_jumper_do_jump() {
