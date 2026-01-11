@@ -108,6 +108,7 @@ _zsh_jumper_load_default_actions() {
         "${ZshJumper[help-key]}:help:${dir}/help.sh"
         "${ZshJumper[var-key]}:var:${dir}/var.sh"
         "${ZshJumper[replace-key]}:replace:${dir}/replace.sh"
+        "${ZshJumper[move-key]}:move:${dir}/move.sh"
     )
 
     local entry binding desc script
@@ -145,6 +146,7 @@ _zsh_jumper_load_config() {
     zstyle -s ':zsh-jumper:' fzf-help-key val; ZshJumper[help-key]="${val:-ctrl-h}"
     zstyle -s ':zsh-jumper:' fzf-var-key val; ZshJumper[var-key]="${val:-ctrl-e}"
     zstyle -s ':zsh-jumper:' fzf-replace-key val; ZshJumper[replace-key]="${val:-ctrl-r}"
+    zstyle -s ':zsh-jumper:' fzf-move-key val; ZshJumper[move-key]="${val:-ctrl-m}"
     zstyle -s ':zsh-jumper:' fzf-instant-key val; ZshJumper[instant-key]="${val:-;}"
     zstyle -s ':zsh-jumper:' debug val; ZshJumper[debug]="${val:-off}"
 

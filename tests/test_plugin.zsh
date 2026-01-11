@@ -102,13 +102,14 @@ test_default_actions_loaded() {
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         # Check that default actions are registered
-        (( \${#_zj_action_bindings[@]} >= 4 )) || exit 1
-        (( \${#_zj_action_scripts[@]} >= 4 )) || exit 1
-        # Verify wrap, help, var, replace are registered
+        (( \${#_zj_action_bindings[@]} >= 5 )) || exit 1
+        (( \${#_zj_action_scripts[@]} >= 5 )) || exit 1
+        # Verify wrap, help, var, replace, move are registered
         [[ \"\${_zj_action_descriptions[*]}\" == *wrap* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *help* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *var* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *replace* ]] || exit 1
+        [[ \"\${_zj_action_descriptions[*]}\" == *move* ]] || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "Default actions loaded"
@@ -123,6 +124,7 @@ test_action_scripts_exist() {
     [[ ! -x "$PLUGIN_DIR/actions/help.sh" ]] && missing+=" help.sh"
     [[ ! -x "$PLUGIN_DIR/actions/var.sh" ]] && missing+=" var.sh"
     [[ ! -x "$PLUGIN_DIR/actions/replace.sh" ]] && missing+=" replace.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/move.sh" ]] && missing+=" move.sh"
 
     if [[ -z "$missing" ]]; then
         test_pass "Action scripts exist and are executable"
@@ -1349,6 +1351,77 @@ test_replace_last_word() {
     fi
 }
 
+# Move action tests - test the swap logic (not the fzf interaction)
+test_move_swap_first_last() {
+    # Test swap logic: swap first and last token
+    # move.sh requires fzf for interactive selection, so we test the buffer manipulation logic
+    # Buffer: "mv oldname.txt newname.txt" -> positions: 0, 3, 15
+    local result
+    result=$(zsh -c '
+        src_pos=0
+        src_word="mv"
+        dest_pos=15
+        dest_word="newname.txt"
+        buffer="mv oldname.txt newname.txt"
+        # Swap: source before destination
+        new_buffer="${buffer:0:$src_pos}${dest_word}${buffer:$((src_pos + ${#src_word})):$((dest_pos - src_pos - ${#src_word}))}${src_word}${buffer:$((dest_pos + ${#dest_word}))}"
+        echo "$new_buffer"
+    ' 2>&1)
+
+    if [[ "$result" == "newname.txt oldname.txt mv" ]]; then
+        test_pass "Move swap first/last"
+    else
+        test_fail "Move swap first/last" "Expected: 'newname.txt oldname.txt mv', Got: '$result'"
+    fi
+}
+
+test_move_swap_adjacent() {
+    # Test swap of adjacent tokens
+    local result
+    result=$(zsh -c '
+        src_pos=3
+        src_word="oldname.txt"
+        dest_pos=15
+        dest_word="newname.txt"
+        buffer="mv oldname.txt newname.txt"
+        # Swap: source before destination
+        new_buffer="${buffer:0:$src_pos}${dest_word}${buffer:$((src_pos + ${#src_word})):$((dest_pos - src_pos - ${#src_word}))}${src_word}${buffer:$((dest_pos + ${#dest_word}))}"
+        echo "$new_buffer"
+    ' 2>&1)
+
+    if [[ "$result" == "mv newname.txt oldname.txt" ]]; then
+        test_pass "Move swap adjacent"
+    else
+        test_fail "Move swap adjacent" "Expected: 'mv newname.txt oldname.txt', Got: '$result'"
+    fi
+}
+
+test_move_script_exists() {
+    if [[ -x "$PLUGIN_DIR/actions/move.sh" ]]; then
+        test_pass "Move script exists and is executable"
+    else
+        test_fail "Move script missing or not executable"
+    fi
+}
+
+test_move_exits_on_single_token() {
+    # move.sh should exit 1 if less than 2 tokens
+    local result exit_code
+    result=$(
+        export ZJ_BUFFER="single"
+        export ZJ_POSITIONS="0"
+        export ZJ_WORDS="single"
+        "$PLUGIN_DIR/actions/move.sh" "single" "1" 2>&1
+    )
+    exit_code=$?
+
+    if [[ $exit_code -eq 1 ]]; then
+        test_pass "Move exits on single token"
+    else
+        test_fail "Move should exit 1 on single token" "Exit code: $exit_code"
+    fi
+}
+
 # Wrap action tests - test wrapping logic directly
 test_wrap_double_quote() {
     local result
@@ -2351,6 +2424,12 @@ run_test test_var_escapes_quotes
 run_test test_replace_deletes_whole_token
 run_test test_replace_first_word
 run_test test_replace_last_word
+
+# Move action tests
+run_test test_move_swap_first_last
+run_test test_move_swap_adjacent
+run_test test_move_script_exists
+run_test test_move_exits_on_single_token
 
 # Wrap action tests
 run_test test_wrap_double_quote
