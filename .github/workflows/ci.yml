@@ -75,3 +75,76 @@ jobs:
             echo "Unexpected: ${ZshJumper[picker]}"
             exit 1
           '
+
+  update-badges:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install zsh and fzf
+        run: sudo apt-get update && sudo apt-get install -y zsh fzf
+
+      - name: Capture perf metrics
+        id: perf
+        run: |
+          # Load time
+          load_ms=$(zsh -c "
+            start=\$(date +%s%N)
+            source ./zsh-jumper.plugin.zsh
+            end=\$(date +%s%N)
+            echo \$(( (end - start) / 1000000 ))
+          ")
+          echo "load_ms=$load_ms" >> $GITHUB_OUTPUT
+
+          # Tokenize 100x
+          tok_ms=$(zsh -c "
+            source ./zsh-jumper.plugin.zsh
+            BUFFER='kubectl get pods -n default -o wide --show-labels'
+            start=\$(date +%s%N)
+            for i in {1..100}; do _zsh_jumper_tokenize; done
+            end=\$(date +%s%N)
+            echo \$(( (end - start) / 1000000 ))
+          ")
+          echo "tok_ms=$tok_ms" >> $GITHUB_OUTPUT
+
+          # Memory (after warmup)
+          mem_kb=$(zsh -c "
+            for i in {1..5}; do source ./zsh-jumper.plugin.zsh; zsh-jumper-unload; done
+            mem1=\$(ps -o rss= -p \$\$)
+            for i in {1..10}; do source ./zsh-jumper.plugin.zsh; zsh-jumper-unload; done
+            mem2=\$(ps -o rss= -p \$\$)
+            echo \$((mem2 - mem1))
+          ")
+          echo "mem_kb=$mem_kb" >> $GITHUB_OUTPUT
+
+      - name: Update gist
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.PERF_GIST_ID }}
+          filename: zsh-jumper-load.json
+          label: load
+          message: ${{ steps.perf.outputs.load_ms }}ms
+          color: brightgreen
+
+      - name: Update tokenize badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.PERF_GIST_ID }}
+          filename: zsh-jumper-tokenize.json
+          label: tokenize 100x
+          message: ${{ steps.perf.outputs.tok_ms }}ms
+          color: brightgreen
+
+      - name: Update memory badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_TOKEN }}
+          gistID: ${{ vars.PERF_GIST_ID }}
+          filename: zsh-jumper-memory.json
+          label: memory
+          message: ${{ steps.perf.outputs.mem_kb }}KB
+          color: brightgreen

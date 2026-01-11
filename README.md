@@ -1,5 +1,9 @@
 # zsh-jumper
 
+![Load Time](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-load.json)
+![Tokenize](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-tokenize.json)
+![Memory](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-memory.json)
+
 Jump to any word on the current command line via fuzzy picker.
 
 Long commands are tedious to navigate. Instead of holding arrow keys or `Ctrl+Left` repeatedly, fuzzy-search any word and jump straight to it.
@@ -203,17 +207,6 @@ zsh-jumper-list  # shows config paths, actions, previewers
 4. `sk` (skim)
 5. `peco`
 6. `percol`
-
-## Performance
-
-Measured load time:
-
-```
-% zmodload zsh/zprof && source zsh-jumper.plugin.zsh && zprof
-num  calls                time            self            name
--------------------------------------------------------------------------------
- 1)    1           0.23     0.23  100.00%  zsh-jumper-setup-bindings
-```
 
 ## Architecture
 
