@@ -144,7 +144,7 @@ _zsh_jumper_load_config() {
     zstyle -s ':zsh-jumper:' fzf-wrap-key val; ZshJumper[wrap-key]="${val:-ctrl-s}"
     zstyle -s ':zsh-jumper:' fzf-var-key val; ZshJumper[var-key]="${val:-ctrl-e}"
     zstyle -s ':zsh-jumper:' fzf-replace-key val; ZshJumper[replace-key]="${val:-ctrl-r}"
-    zstyle -s ':zsh-jumper:' fzf-move-key val; ZshJumper[move-key]="${val:-ctrl-m}"
+    zstyle -s ':zsh-jumper:' fzf-move-key val; ZshJumper[move-key]="${val:-ctrl-t}"
     zstyle -s ':zsh-jumper:' fzf-instant-key val; ZshJumper[instant-key]="${val:-;}"
     zstyle -s ':zsh-jumper:' debug val; ZshJumper[debug]="${val:-off}"
 
@@ -494,6 +494,9 @@ zsh-jumper-widget() {
     # Invoke picker
     zle -I
     printf '%s\n' "${numbered[@]}" | _zsh_jumper_invoke_picker "$picker" "jump> " "$header" "$binds" "${preview_args[@]}"
+
+    # Clear overlay line from terminal scrollback (move up, clear line)
+    [[ "${ZshJumper[overlay]}" != "off" ]] && print -n '\e[1A\e[2K'
 
     # Restore original buffer and clear highlights
     region_highlight=()

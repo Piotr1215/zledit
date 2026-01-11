@@ -2023,6 +2023,15 @@ test_overlay_functions_exist() {
     fi
 }
 
+test_overlay_clear_escape_sequence() {
+    # Verify the ANSI escape sequence for clearing overlay is present and correct
+    if grep -q "\\\\e\[1A\\\\e\[2K" "$PLUGIN_DIR/zsh-jumper.plugin.zsh"; then
+        test_pass "Overlay clear escape sequence present (move up + clear line)"
+    else
+        test_fail "Missing overlay clear escape sequence \\e[1A\\e[2K"
+    fi
+}
+
 test_instant_key_default() {
     local result
     result=$(zsh -c '
@@ -2528,6 +2537,7 @@ run_test test_extract_index_number
 run_test test_numbered_list_format
 run_test test_lettered_list_format
 run_test test_overlay_functions_exist
+run_test test_overlay_clear_escape_sequence
 run_test test_instant_key_default
 run_test test_instant_key_configurable
 

@@ -80,6 +80,12 @@ _zsh_jumper_highlight_hints() {
 
 Instant mode uses fzf's `rebind` action - letter keys start unbound, `;` rebinds them for direct jump.
 
+**Overlay cleanup:** After picker exits, we clear the overlay from terminal scrollback:
+```zsh
+print -n '\e[1A\e[2K'  # CSI cursor up + CSI erase line
+```
+Standard VT100 codes - works in all modern terminals.
+
 ## Tokenizer Design
 
 ### Scope (intentional constraints)
@@ -303,6 +309,12 @@ Environment variables:
 - 2 = display mode (print stdout, no buffer change)
 - 3 = push-line (format: `buffer\n---ZJ_PUSHLINE---\ncommand`, user presses Enter)
 - 4 = push-line + auto-execute (same format, executes immediately)
+
+**History avoidance:** For exit codes 3/4, prepend a space to the pushed command:
+```bash
+echo " ${EDITOR:-vim} \"$file\""  # leading space = skipped by HIST_IGNORE_SPACE
+```
+Prevents helper commands from polluting shell history.
 
 **Cursor position (optional):**
 
