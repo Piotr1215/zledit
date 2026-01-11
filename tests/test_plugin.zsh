@@ -1933,51 +1933,6 @@ test_overlay_functions_exist() {
     fi
 }
 
-test_preview_function_strips_prefix() {
-    # Test that _zsh_jumper_preview strips "N: " prefix and handles paths
-    local result
-    result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        # Create a temp file to preview
-        tmpfile=$(mktemp)
-        echo "test content" > "$tmpfile"
-        # Call preview with fzf-style input
-        output=$(_zsh_jumper_preview "1: $tmpfile")
-        rm "$tmpfile"
-        # Strip ANSI codes (bat adds colors)
-        output="${output//\x1b\[*m/}"
-        # Strip line number prefix from bat (e.g., "   1 ")
-        output="${output##*[0-9] }"
-        [[ "$output" == *"test content"* ]] && echo "ok" || echo "got: $output"
-    ' 2>&1)
-
-    if [[ "$result" == "ok" ]]; then
-        test_pass "Preview function strips prefix and shows file content"
-    else
-        test_fail "Preview function failed" "$result"
-    fi
-}
-
-test_preview_handles_var_format() {
-    # Test that _zsh_jumper_preview extracts value from VAR=value format
-    local result
-    result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        tmpdir=$(mktemp -d)
-        # Input like: "1: HOME=/tmp/xxx"
-        output=$(_zsh_jumper_preview "1: HOME=$tmpdir")
-        rmdir "$tmpdir"
-        # Should show ls of the value path
-        [[ -n "$output" ]] && echo "ok" || echo "empty"
-    ' 2>&1)
-
-    if [[ "$result" == "ok" ]]; then
-        test_pass "Preview function handles VAR=value format"
-    else
-        test_fail "Preview VAR format failed" "$result"
-    fi
-}
-
 test_instant_key_default() {
     local result
     result=$(zsh -c '
@@ -2411,8 +2366,6 @@ run_test test_extract_index_without_hint_prefix
 run_test test_extract_index_multidigit_hint
 run_test test_numbered_list_with_hints
 run_test test_overlay_functions_exist
-run_test test_preview_function_strips_prefix
-run_test test_preview_handles_var_format
 run_test test_instant_key_default
 run_test test_instant_key_configurable
 

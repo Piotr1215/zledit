@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # zsh-jumper action: replace (delete token)
 # Args: $1 = token, $2 = index (1-based)
-# Env:  ZJ_BUFFER, ZJ_WORDS, ZJ_POSITIONS
+# Env:  ZJ_BUFFER, ZJ_POSITIONS
 # Output: new buffer with token removed + cursor position
 # Exit: 0
 

@@ -3,7 +3,7 @@
 # Pattern: ^https?://
 
 TOKEN="$1"
-[[ -z "$TOKEN" ]] && TOKEN="$TOKEN"  # fallback to env var
+[[ -z "$TOKEN" ]] && exit 1
 
 # Quick curl to get page title
 if command -v curl &>/dev/null; then

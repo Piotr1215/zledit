@@ -67,11 +67,30 @@ Your script receives:
 | `ZJ_CURSOR` | Current cursor position |
 | `ZJ_PICKER` | Active picker (fzf, fzf-tmux, sk) |
 
-### Output
+### Output & Exit Codes
 
-Write the new buffer to stdout:
-- Exit 0 = apply output as new buffer
-- Exit non-zero = cancel, no change
+| Exit | Behavior |
+|------|----------|
+| 0 | Apply stdout as new buffer |
+| 1 | Error - show stderr message |
+| 2 | Display mode - print stdout, no buffer change |
+| 3 | Push-line - save buffer, show pushed command (user presses Enter) |
+| 4 | Push-line + auto-execute - save buffer, execute pushed command immediately |
+
+For exit codes 3 and 4, use this output format:
+```
+original_buffer_to_restore
+---ZJ_PUSHLINE---
+command_to_execute
+```
+
+Example: Smart edit action that opens files in editor then returns to original command:
+```bash
+echo "$ZJ_BUFFER"
+echo "---ZJ_PUSHLINE---"
+echo "\${EDITOR:-vim} \"$TOKEN\""
+exit 4
+```
 
 ### Cursor Position
 

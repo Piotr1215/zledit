@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # zsh-jumper action: help (show help for token)
-# Args: $1 = token, $2 = index (1-based)
-# Env:  ZJ_BUFFER, ZJ_WORDS
+# Args: $1 = token
+# Env:  ZJ_WORDS
 # Output: help text to display
 # Exit: 2 (display mode - shows output but doesn't modify buffer)
 
 set -eo pipefail
 
 TOKEN="$1"
-INDEX="$2"
 
 [[ -z "$TOKEN" || -z "$ZJ_WORDS" ]] && exit 1
 

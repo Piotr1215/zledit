@@ -59,8 +59,11 @@ _zsh_jumper_parse_toml() {
         fi
         if (( in_target )) && [[ "$line" =~ '^[[:space:]]*([a-zA-Z_]+)[[:space:]]*=[[:space:]]*(.+)' ]]; then
             local key="${match[1]}" value="${match[2]}"
-            [[ "$value" == \"*\" ]] && value="${value#\"}"; value="${value%\"}"
-            [[ "$value" == \'*\' ]] && value="${value#\'}"; value="${value%\'}"
+            if [[ "$value" == \"*\" ]]; then
+                value="${value#\"}"; value="${value%\"}"
+            elif [[ "$value" == \'*\' ]]; then
+                value="${value#\'}"; value="${value%\'}"
+            fi
             current_item[$key]="$value"
         fi
     done < "$file"
@@ -380,25 +383,6 @@ _zsh_jumper_tokenize() {
     fi
 }
 
-_zsh_jumper_preview() {
-    local t="$1"
-    t="${t#*: }"
-    t="${t//\"/}"
-    t="${t//\'/}"
-    [[ "$t" == *=* ]] && t="${t##*=}"
-    [[ "$t" == "~"* ]] && t="$HOME${t#"~"}"
-
-    if [[ -d "$t" ]]; then
-        ls -la "$t" 2>/dev/null
-    elif [[ -f "$t" ]]; then
-        if command -v bat >/dev/null; then
-            bat --style=plain --color=always -n --line-range=:30 "$t" 2>/dev/null
-        else
-            head -30 "$t" 2>/dev/null
-        fi
-    fi
-}
-
 # Build preview command
 # Returns preview command string via REPLY
 _zsh_jumper_build_preview_cmd() {
@@ -595,6 +579,7 @@ _zsh_jumper_do_jump() {
 #     1 = error (show stderr)
 #     2 = display mode (show stdout in terminal, no buffer change)
 #     3 = push-line mode (format: "new_buffer\n---ZJ_PUSHLINE---\npushed_line")
+#     4 = push-line + auto-execute (same format, but executes pushed_line immediately)
 _zsh_jumper_do_custom_action() {
     emulate -L zsh
     local action_idx="$1" sel="$2"
@@ -642,7 +627,7 @@ _zsh_jumper_do_custom_action() {
             fi
             ;;
         1)  # Error
-            [[ -n "$stderr_out" ]] && zle -M "action failed: $stderr_out"
+            [[ -n "$stderr_out" ]] && zle -M "zsh-jumper: action failed: $stderr_out"
             return 1
             ;;
         2)  # Display mode - show output in terminal
@@ -656,13 +641,32 @@ _zsh_jumper_do_custom_action() {
             if [[ "$result" == *"---ZJ_PUSHLINE---"* ]]; then
                 local new_buffer="${result%%---ZJ_PUSHLINE---*}"
                 local pushed_line="${result#*---ZJ_PUSHLINE---}"
-                new_buffer="${new_buffer%$'\n'}"  # Strip trailing newline
-                pushed_line="${pushed_line#$'\n'}"  # Strip leading newline
+                new_buffer="${new_buffer%$'\n'}"
+                pushed_line="${pushed_line#$'\n'}"
                 BUFFER="$new_buffer"
-                CURSOR="${_zj_positions[$token_idx]}"  # Token position
+                CURSOR="${_zj_positions[$token_idx]}"
+                zle push-line
+                # Check for CURSOR:N in pushed_line
+                local last_line="${pushed_line##*$'\n'}"
+                if [[ "$last_line" =~ ^CURSOR:([0-9]+)$ ]]; then
+                    BUFFER="${pushed_line%$'\n'*}"
+                    CURSOR="${match[1]}"
+                else
+                    BUFFER="$pushed_line"
+                    CURSOR=${#BUFFER}
+                fi
+            fi
+            ;;
+        4)  # Push-line + auto-execute
+            if [[ "$result" == *"---ZJ_PUSHLINE---"* ]]; then
+                local new_buffer="${result%%---ZJ_PUSHLINE---*}"
+                local pushed_line="${result#*---ZJ_PUSHLINE---}"
+                new_buffer="${new_buffer%$'\n'}"
+                pushed_line="${pushed_line#$'\n'}"
+                BUFFER="$new_buffer"
                 zle push-line
                 BUFFER="$pushed_line"
-                CURSOR=${#BUFFER}
+                zle accept-line
             fi
             ;;
     esac

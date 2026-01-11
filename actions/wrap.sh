@@ -45,6 +45,8 @@ fi
 # Use picker to select wrapper
 if [[ "$picker" == "fzf-tmux" ]]; then
     selected=$(echo "$wrappers" | fzf-tmux --reverse --prompt="wrap> " --header="Select wrapper") || exit 1
+elif [[ "$picker" == "sk" ]]; then
+    selected=$(echo "$wrappers" | sk --height=15 --reverse --prompt="wrap> " --header="Select wrapper") || exit 1
 else
     selected=$(echo "$wrappers" | fzf --height=15 --reverse --prompt="wrap> " --header="Select wrapper") || exit 1
 fi

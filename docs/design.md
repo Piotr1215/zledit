@@ -298,8 +298,11 @@ Environment variables:
 - `ZJ_PICKER` = active picker (fzf, fzf-tmux, sk, peco, percol)
 
 **Exit codes:**
-- 0 = apply stdout as new buffer
-- non-zero = cancel, no change
+- 0 = apply stdout as new buffer (supports CURSOR:N override)
+- 1 = error, show stderr message
+- 2 = display mode (print stdout, no buffer change)
+- 3 = push-line (format: `buffer\n---ZJ_PUSHLINE---\ncommand`, user presses Enter)
+- 4 = push-line + auto-execute (same format, executes immediately)
 
 **Cursor position (optional):**
 
