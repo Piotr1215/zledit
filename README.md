@@ -215,6 +215,32 @@ The single-pass tokenizer records word positions during parsing. Actions access 
 
 See [docs/design.md](docs/design.md) for engineering details.
 
+## Extensibility (Advanced)
+
+The plugin works out of the box with built-in actions. For power users who want custom behavior, extensibility is opt-in via TOML config:
+
+```zsh
+zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
+```
+
+```toml
+# Custom previewer for URLs
+[[previewers]]
+pattern = '^https?://'
+description = 'URL preview'
+script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+
+# Custom action bound to Ctrl+U
+[[actions]]
+binding = 'ctrl-u'
+description = 'upper'
+script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+```
+
+User-defined actions override built-in defaults when bindings collide.
+
+See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts, and [docs/design.md](docs/design.md) for the technical reference.
+
 ## Testing
 
 ```bash

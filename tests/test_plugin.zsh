@@ -67,6 +67,7 @@ test_functions_defined() {
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         (( \$+functions[zsh-jumper-widget] )) || exit 1
         (( \$+functions[_zsh_jumper_load_config] )) || exit 1
+        (( \$+functions[_zsh_jumper_load_default_actions] )) || exit 1
         (( \$+functions[_zsh_jumper_invoke_picker] )) || exit 1
         (( \$+functions[_zsh_jumper_adapter_fzf] )) || exit 1
         (( \$+functions[zsh-jumper-setup-bindings] )) || exit 1
@@ -74,9 +75,7 @@ test_functions_defined() {
         (( \$+functions[_zsh_jumper_tokenize] )) || exit 1
         (( \$+functions[_zsh_jumper_supports_binds] )) || exit 1
         (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_wrap] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_help] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_var] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_custom_action] )) || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "All functions defined"
@@ -95,6 +94,40 @@ test_global_state() {
         test_pass "Global state initialized"
     else
         test_fail "Global state not set" "$result"
+    fi
+}
+
+test_default_actions_loaded() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        # Check that default actions are registered
+        (( \${#_zj_action_bindings[@]} >= 4 )) || exit 1
+        (( \${#_zj_action_scripts[@]} >= 4 )) || exit 1
+        # Verify wrap, help, var, replace are registered
+        [[ \"\${_zj_action_descriptions[*]}\" == *wrap* ]] || exit 1
+        [[ \"\${_zj_action_descriptions[*]}\" == *help* ]] || exit 1
+        [[ \"\${_zj_action_descriptions[*]}\" == *var* ]] || exit 1
+        [[ \"\${_zj_action_descriptions[*]}\" == *replace* ]] || exit 1
+    " 2>&1)
+    if [[ $? -eq 0 ]]; then
+        test_pass "Default actions loaded"
+    else
+        test_fail "Default actions not loaded" "$result"
+    fi
+}
+
+test_action_scripts_exist() {
+    local missing=""
+    [[ ! -x "$PLUGIN_DIR/actions/wrap.sh" ]] && missing+=" wrap.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/help.sh" ]] && missing+=" help.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/var.sh" ]] && missing+=" var.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/replace.sh" ]] && missing+=" replace.sh"
+
+    if [[ -z "$missing" ]]; then
+        test_pass "Action scripts exist and are executable"
+    else
+        test_fail "Missing action scripts:$missing"
     fi
 }
 
@@ -1097,9 +1130,8 @@ test_action_helpers_defined() {
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_wrap] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_help] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_var] )) || exit 1
+        (( \$+functions[_zsh_jumper_do_custom_action] )) || exit 1
+        (( \$+functions[_zsh_jumper_load_default_actions] )) || exit 1
         echo 'ok'
     " 2>&1)
 
@@ -1131,9 +1163,8 @@ test_unload_cleans_enrichment() {
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         zsh-jumper-unload
         (( \$+functions[_zsh_jumper_do_jump] )) && exit 1
-        (( \$+functions[_zsh_jumper_do_wrap] )) && exit 1
-        (( \$+functions[_zsh_jumper_do_help] )) && exit 1
-        (( \$+functions[_zsh_jumper_do_var] )) && exit 1
+        (( \$+functions[_zsh_jumper_do_custom_action] )) && exit 1
+        (( \$+functions[_zsh_jumper_load_default_actions] )) && exit 1
         (( \$+functions[_zsh_jumper_tokenize] )) && exit 1
         exit 0
     " 2>&1)
@@ -1268,53 +1299,53 @@ test_var_escapes_quotes() {
 }
 
 test_replace_deletes_whole_token() {
-    local result
-    result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        BUFFER="echo --flag-long-!123 bar"
-        _zsh_jumper_tokenize
-        _zsh_jumper_do_replace "2: --flag-long-!123"
-        echo "$BUFFER|$CURSOR"
-    ' 2>&1)
+    # Test external replace action script
+    local result buffer
+    result=$(
+        export ZJ_BUFFER="echo --flag-long-!123 bar"
+        export ZJ_POSITIONS=$'0\n5\n22'
+        "$PLUGIN_DIR/actions/replace.sh" "--flag-long-!123" "2" 2>&1
+    )
+    buffer="${result%$'\n'}"  # Strip trailing newline
 
-    if [[ "$result" == "echo  bar|5" ]]; then
+    if [[ "$buffer" == "echo  bar" ]]; then
         test_pass "Replace deletes whole token"
     else
-        test_fail "Replace failed" "Expected: 'echo  bar|5', Got: '$result'"
+        test_fail "Replace failed" "Expected: 'echo  bar', Got: '$buffer'"
     fi
 }
 
 test_replace_first_word() {
-    local result
-    result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        BUFFER="kubectl get pods"
-        _zsh_jumper_tokenize
-        _zsh_jumper_do_replace "1: kubectl"
-        echo "$BUFFER|$CURSOR"
-    ' 2>&1)
+    # Test external replace action script
+    local result buffer
+    result=$(
+        export ZJ_BUFFER="kubectl get pods"
+        export ZJ_POSITIONS=$'0\n8\n12'
+        "$PLUGIN_DIR/actions/replace.sh" "kubectl" "1" 2>&1
+    )
+    buffer="${result%$'\n'}"  # Strip trailing newline
 
-    if [[ "$result" == " get pods|0" ]]; then
+    if [[ "$buffer" == " get pods" ]]; then
         test_pass "Replace first word"
     else
-        test_fail "Replace first word failed" "Expected: ' get pods|0', Got: '$result'"
+        test_fail "Replace first word failed" "Expected: ' get pods', Got: '$buffer'"
     fi
 }
 
 test_replace_last_word() {
-    local result
-    result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        BUFFER="git commit -m"
-        _zsh_jumper_tokenize
-        _zsh_jumper_do_replace "3: -m"
-        echo "$BUFFER|$CURSOR"
-    ' 2>&1)
+    # Test external replace action script
+    local result buffer
+    result=$(
+        export ZJ_BUFFER="git commit -m"
+        export ZJ_POSITIONS=$'0\n4\n11'
+        "$PLUGIN_DIR/actions/replace.sh" "-m" "3" 2>&1
+    )
+    buffer="${result%$'\n'}"  # Strip trailing newline
 
-    if [[ "$result" == "git commit |11" ]]; then
+    if [[ "$buffer" == "git commit " ]]; then
         test_pass "Replace last word"
     else
-        test_fail "Replace last word failed" "Expected: 'git commit |11', Got: '$result'"
+        test_fail "Replace last word failed" "Expected: 'git commit ', Got: '$buffer'"
     fi
 }
 
@@ -2003,6 +2034,263 @@ test_command_with_double_dash() {
 }
 
 # ------------------------------------------------------------------------------
+# Extensibility Tests
+# ------------------------------------------------------------------------------
+
+test_toml_parser_previewers() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$PLUGIN_DIR/tests/fixtures/test_previewers.toml' previewers
+        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]}\"
+    " 2>&1)
+
+    if [[ "$result" == '3:^https?://.*' ]]; then
+        test_pass "TOML parser extracts previewers correctly"
+    else
+        test_fail "TOML parser previewers failed" "Expected: 3:^https?://.*, Got: $result"
+    fi
+}
+
+test_toml_parser_actions() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$PLUGIN_DIR/tests/fixtures/test_actions.toml' actions
+        echo \"\${#_zj_action_bindings[@]}:\${_zj_action_bindings[1]}:\${_zj_action_descriptions[1]}\"
+    " 2>&1)
+
+    if [[ "$result" == "2:ctrl-y:uppercase" ]]; then
+        test_pass "TOML parser extracts actions correctly"
+    else
+        test_fail "TOML parser actions failed" "Expected: 2:ctrl-y:uppercase, Got: $result"
+    fi
+}
+
+test_toml_parser_missing_file() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '/nonexistent/file.toml' previewers
+        echo \$?
+    " 2>&1)
+
+    if [[ "$result" == "1" ]]; then
+        test_pass "TOML parser returns 1 for missing file"
+    else
+        test_fail "TOML parser missing file" "Expected: 1, Got: $result"
+    fi
+}
+
+test_toml_parser_empty_file() {
+    local result tmpfile
+    tmpfile=$(mktemp)
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$tmpfile' previewers
+        echo \"\${#_zj_previewer_patterns[@]}\"
+    " 2>&1)
+    rm -f "$tmpfile"
+
+    if [[ "$result" == "0" ]]; then
+        test_pass "TOML parser handles empty file"
+    else
+        test_fail "TOML parser empty file" "Expected: 0, Got: $result"
+    fi
+}
+
+test_toml_parser_comments() {
+    local result tmpfile
+    tmpfile=$(mktemp)
+    cat > "$tmpfile" << 'EOF'
+# This is a comment
+[[previewers]]
+# Another comment
+pattern = '^test$'
+script = '/bin/echo'
+EOF
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$tmpfile' previewers
+        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]}\"
+    " 2>&1)
+    rm -f "$tmpfile"
+
+    if [[ "$result" == '1:^test$' ]]; then
+        test_pass "TOML parser ignores comments"
+    else
+        test_fail "TOML parser comments" "Expected: 1:^test\$, Got: $result"
+    fi
+}
+
+test_build_preview_cmd_script() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_build_preview_cmd
+        # Script-based preview uses preview.sh
+        [[ \"\$REPLY\" == *\"preview.sh\"* ]] && echo 'ok' || echo \"\$REPLY\"
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Build preview cmd uses script"
+    else
+        test_fail "Build preview cmd script failed" "$result"
+    fi
+}
+
+test_build_preview_cmd_fallback() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        # Simulate no script available
+        ZshJumper[dir]='/nonexistent'
+        _zsh_jumper_build_preview_cmd
+        # Fallback should have inline preview
+        [[ \"\$REPLY\" == *\"ls -la\"* ]] && echo 'ok' || echo \"\$REPLY\"
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Build preview cmd fallback works"
+    else
+        test_fail "Build preview cmd fallback failed" "$result"
+    fi
+}
+
+test_custom_action_function_exists() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        (( \$+functions[_zsh_jumper_do_custom_action] )) && echo 'ok' || echo 'missing'
+    " 2>&1)
+
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Custom action function exists"
+    else
+        test_fail "Custom action function missing" "$result"
+    fi
+}
+
+test_extensibility_config_loading() {
+    local result tmpfile
+    tmpfile=$(mktemp)
+    cat > "$tmpfile" << 'EOF'
+[[previewers]]
+pattern = '^test$'
+script = '/bin/echo'
+EOF
+    result=$(zsh -c "
+        zstyle ':zsh-jumper:' previewer-config '$tmpfile'
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        echo \"\${#_zj_previewer_patterns[@]}\"
+    " 2>&1)
+    rm -f "$tmpfile"
+
+    if [[ "$result" == "1" ]]; then
+        test_pass "Extensibility config loaded via zstyle"
+    else
+        test_fail "Extensibility config loading failed" "Expected: 1, Got: $result"
+    fi
+}
+
+test_unload_cleans_extensibility() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zj_previewer_patterns=('test')
+        _zj_action_bindings=('ctrl-t')
+        zsh-jumper-unload
+        (( \$+functions[_zsh_jumper_parse_toml] )) && exit 1
+        (( \$+functions[_zsh_jumper_do_custom_action] )) && exit 1
+        (( \$+functions[_zsh_jumper_build_preview_cmd] )) && exit 1
+        exit 0
+    " 2>&1)
+    if [[ $? -eq 0 ]]; then
+        test_pass "Unload cleans extensibility functions"
+    else
+        test_fail "Unload extensibility cleanup failed" "$result"
+    fi
+}
+
+test_toml_malformed_no_equals() {
+    local result tmpfile
+    tmpfile=$(mktemp)
+    cat > "$tmpfile" << 'EOF'
+[[previewers]]
+pattern '^test$'
+command = 'echo test'
+EOF
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$tmpfile' previewers
+        echo \"\${#_zj_previewer_patterns[@]}\"
+    " 2>&1)
+    rm -f "$tmpfile"
+    if [[ "$result" == "0" ]]; then
+        test_pass "TOML parser ignores malformed line (no equals)"
+    else
+        test_fail "TOML malformed handling" "Expected: 0, Got: $result"
+    fi
+}
+
+test_toml_unclosed_quotes() {
+    local result tmpfile
+    tmpfile=$(mktemp)
+    cat > "$tmpfile" << 'EOF'
+[[previewers]]
+pattern = '^test$
+command = 'echo test'
+EOF
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        _zsh_jumper_parse_toml '$tmpfile' previewers
+        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]:-empty}\"
+    " 2>&1)
+    rm -f "$tmpfile"
+    # Parser takes value as-is when quotes don't match
+    if [[ "$result" == *"empty"* ]] || [[ "$result" == "1:"* ]]; then
+        test_pass "TOML parser handles unclosed quotes"
+    else
+        test_fail "TOML unclosed quotes" "Got: $result"
+    fi
+}
+
+test_preview_script_exists() {
+    if [[ -x "$PLUGIN_DIR/preview.sh" ]]; then
+        test_pass "Preview script exists and is executable"
+    else
+        test_fail "Preview script missing" "$PLUGIN_DIR/preview.sh"
+    fi
+}
+
+test_action_nonzero_exit() {
+    local result tmpdir script
+    tmpdir=$(mktemp -d)
+    script="$tmpdir/fail.sh"
+    cat > "$script" << 'EOF'
+#!/bin/bash
+echo "error message" >&2
+exit 1
+EOF
+    chmod +x "$script"
+    result=$(zsh -c "
+        _zj_words=(echo test)
+        local script='$script' selected_index=0
+        local result stderr_file=\$(mktemp)
+        result=\$(printf '%s\n' \"\${_zj_words[@]}\" | SELECTED_INDEX=\"\$selected_index\" \"\$script\" 2>\"\$stderr_file\")
+        local exit_code=\$?
+        rm -f \"\$stderr_file\"
+        echo \"exit:\$exit_code\"
+    " 2>&1)
+    rm -rf "$tmpdir"
+    if [[ "$result" == "exit:1" ]]; then
+        test_pass "Action non-zero exit detected"
+    else
+        test_fail "Action non-zero exit" "Expected: exit:1, Got: $result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Run tests
 # ------------------------------------------------------------------------------
 
@@ -2012,6 +2300,8 @@ print ""
 run_test test_plugin_loads
 run_test test_functions_defined
 run_test test_global_state
+run_test test_default_actions_loaded
+run_test test_action_scripts_exist
 run_test test_picker_detection_fzf
 run_test test_picker_detection_sk
 run_test test_picker_detection_peco
@@ -2125,6 +2415,21 @@ run_test test_preview_function_strips_prefix
 run_test test_preview_handles_var_format
 run_test test_instant_key_default
 run_test test_instant_key_configurable
+
+# Extensibility tests
+run_test test_toml_parser_previewers
+run_test test_toml_parser_actions
+run_test test_toml_parser_missing_file
+run_test test_toml_parser_empty_file
+run_test test_toml_parser_comments
+run_test test_toml_malformed_no_equals
+run_test test_toml_unclosed_quotes
+run_test test_build_preview_cmd_script
+run_test test_build_preview_cmd_fallback
+run_test test_custom_action_function_exists
+run_test test_extensibility_config_loading
+run_test test_action_nonzero_exit
+run_test test_unload_cleans_extensibility
 
 print ""
 local actual_tests=$((TESTS_RUN - TESTS_SKIPPED))

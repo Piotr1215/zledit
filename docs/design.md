@@ -226,6 +226,116 @@ Invariants the widget relies on:
 - `_zj_words` and `_zj_positions` are aligned (same length)
 - Positions are valid indices into current BUFFER
 
+## Extensibility
+
+Two extension points: **Previewers** (custom preview for token patterns) and **Actions** (custom scripts for token manipulation). All built-in actions (wrap, help, var, replace) use the same external script interface as user-defined actions.
+
+### Configuration
+
+Single config file for both previewers and actions:
+
+```zsh
+zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
+```
+
+### TOML Parser
+
+Minimal subset parser (no external dependencies):
+- `[[array]]` headers for tables of tables
+- `key = 'value'` and `key = "value"`
+- `#` comments
+
+```zsh
+_zsh_jumper_parse_toml() {
+    # Reads file line-by-line
+    # Extracts [[previewers]] and [[actions]] blocks
+    # Returns: count:pattern1:desc1:script1:pattern2:desc2:script2:...
+}
+```
+
+### Previewers
+
+Match token against regex patterns, run first matching script.
+
+```toml
+[[previewers]]
+pattern = '^https?://'
+description = 'URL preview'
+script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+
+[[previewers]]
+pattern = '\.(json|yaml|yml)$'
+description = 'Structured data'
+script = '/usr/bin/cat'
+```
+
+**Script interface:**
+- `$1` = token to preview
+- Output to stdout for fzf preview window
+
+### Actions
+
+Custom scripts triggered by FZF key bindings. User-defined actions override built-in defaults.
+
+```toml
+[[actions]]
+binding = 'ctrl-u'
+description = 'upper'
+script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+```
+
+**Script Interface:**
+
+Arguments:
+- `$1` = selected token
+- `$2` = token index (1-based)
+
+Environment variables:
+- `ZJ_BUFFER` = current command line
+- `ZJ_POSITIONS` = newline-delimited start positions
+- `ZJ_WORDS` = newline-delimited tokens
+- `ZJ_CURSOR` = current cursor position
+- `ZJ_PICKER` = active picker (fzf, fzf-tmux, sk, peco, percol)
+
+**Exit codes:**
+- 0 = apply stdout as new buffer
+- non-zero = cancel, no change
+
+**Cursor position (optional):**
+
+By default, cursor stays at the original token position. Override with `CURSOR:N`:
+```
+new buffer content
+CURSOR:42
+```
+
+**Example action script:**
+
+```bash
+#!/usr/bin/env bash
+# uppercase.sh - convert token to UPPERCASE
+set -eo pipefail
+
+TOKEN="$1"
+INDEX="$2"
+
+[[ -z "$TOKEN" || -z "$INDEX" || -z "$ZJ_BUFFER" || -z "$ZJ_POSITIONS" ]] && exit 1
+
+# Parse positions array
+IFS=$'\n' read -r -d '' -a positions <<< "$ZJ_POSITIONS" || true
+pos="${positions[$((INDEX - 1))]}"
+[[ -z "$pos" ]] && exit 1
+
+# Transform token
+upper=$(echo "$TOKEN" | tr '[:lower:]' '[:upper:]')
+
+# Replace in buffer
+end_pos=$((pos + ${#TOKEN}))
+echo "${ZJ_BUFFER:0:$pos}${upper}${ZJ_BUFFER:$end_pos}"
+```
+
+See `examples/` for more sample scripts.
+
 ## Future Considerations
 
 **v2 scope (separate tokenizer, not extension):**

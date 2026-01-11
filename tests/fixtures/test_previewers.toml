@@ -1,0 +1,15 @@
+# Test previewers config
+[[previewers]]
+pattern = '^https?://.*'
+description = 'URL previewer'
+script = '/usr/bin/echo'
+
+[[previewers]]
+pattern = '^/.*'
+description = 'Path previewer'
+script = '/bin/ls'
+
+[[previewers]]
+pattern = '\.json$'
+description = 'JSON previewer'
+script = '/usr/bin/cat'
