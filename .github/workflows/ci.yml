@@ -135,7 +135,7 @@ jobs:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ secrets.PERF_GIST_ID }}
           filename: zsh-jumper-tokenize.json
-          label: tokenize 100x
+          label: parse
           message: ${{ steps.perf.outputs.tok_ms }}ms
           color: brightgreen
 
@@ -145,6 +145,6 @@ jobs:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ secrets.PERF_GIST_ID }}
           filename: zsh-jumper-memory.json
-          label: memory
-          message: ${{ steps.perf.outputs.mem_kb }}KB
+          label: leak
+          message: +${{ steps.perf.outputs.mem_kb }}KB
           color: brightgreen

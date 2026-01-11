@@ -1,8 +1,8 @@
 # zsh-jumper
 
-![Load Time](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-load.json)
-![Tokenize](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-tokenize.json)
-![Memory](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Piotr1215/ff146261d69233bc22353774c4540492/raw/zsh-jumper-memory.json)
+![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-load.json)
+![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-tokenize.json)
+![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-memory.json)
 
 Jump to any word on the current command line via fuzzy picker.
 
