@@ -1160,20 +1160,23 @@ test_single_keybinding() {
 }
 
 test_unload_cleans_enrichment() {
-    local result
-    result=$(zsh -c "
+    # Comprehensive leak detection - catches ANY leaked function/variable by pattern
+    local leaked_funcs leaked_vars
+    leaked_funcs=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
         zsh-jumper-unload
-        (( \$+functions[_zsh_jumper_do_jump] )) && exit 1
-        (( \$+functions[_zsh_jumper_do_custom_action] )) && exit 1
-        (( \$+functions[_zsh_jumper_load_default_actions] )) && exit 1
-        (( \$+functions[_zsh_jumper_tokenize] )) && exit 1
-        exit 0
+        print -l \${(k)functions} | grep -E '^_?zsh.jumper|^_zj_' || true
     " 2>&1)
-    if [[ $? -eq 0 ]]; then
-        test_pass "Unload removes enrichment functions"
+    leaked_vars=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        zsh-jumper-unload
+        print -l \${(k)parameters} | grep -E '^_zj_|^ZshJumper' || true
+    " 2>&1)
+
+    if [[ -z "$leaked_funcs" && -z "$leaked_vars" ]]; then
+        test_pass "Unload removes all functions and variables"
     else
-        test_fail "Unload failed to clean enrichment" "$result"
+        test_fail "Unload leaked:" "funcs: $leaked_funcs | vars: $leaked_vars"
     fi
 }
 
@@ -2336,6 +2339,71 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
+# Performance tests (with thresholds)
+# ------------------------------------------------------------------------------
+
+test_perf_load_time() {
+    local max_ms=200  # Threshold: plugin should load in <200ms
+    local total=0
+    for i in {1..3}; do
+        local ms=$(zsh -c "
+            start=\$(date +%s%N)
+            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+            end=\$(date +%s%N)
+            echo \$(( (end - start) / 1000000 ))
+        " 2>&1)
+        total=$((total + ms))
+    done
+    local avg=$((total / 3))
+    if (( avg < max_ms )); then
+        test_pass "Load time ${avg}ms (< ${max_ms}ms threshold)"
+    else
+        test_fail "Load time ${avg}ms exceeds ${max_ms}ms threshold"
+    fi
+}
+
+test_perf_tokenize() {
+    local max_ms=100  # 100 tokenizations should complete in <100ms
+    local ms=$(zsh -c "
+        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        BUFFER='kubectl get pods -n default -o wide --show-labels --sort-by=name'
+        start=\$(date +%s%N)
+        for i in {1..100}; do _zsh_jumper_tokenize; done
+        end=\$(date +%s%N)
+        echo \$(( (end - start) / 1000000 ))
+    " 2>&1)
+    if (( ms < max_ms )); then
+        test_pass "Tokenize 100x in ${ms}ms (< ${max_ms}ms threshold)"
+    else
+        test_fail "Tokenize 100x took ${ms}ms, exceeds ${max_ms}ms threshold"
+    fi
+}
+
+test_perf_memory_no_leak() {
+    # Verify no memory LEAK (linear growth) - one-time allocation is OK
+    # Compare memory at cycle 5 vs cycle 15 (skip initial allocation)
+    local result=$(zsh -c "
+        for i in {1..5}; do
+            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+            zsh-jumper-unload
+        done
+        mem1=\$(ps -o rss= -p \$\$)
+        for i in {1..10}; do
+            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+            zsh-jumper-unload
+        done
+        mem2=\$(ps -o rss= -p \$\$)
+        echo \$((mem2 - mem1))
+    " 2>&1)
+    local max_growth=100  # After warmup, should be stable within 100KB
+    if (( result < max_growth )); then
+        test_pass "No memory leak after warmup (delta: ${result}KB)"
+    else
+        test_fail "Memory leak detected: grew ${result}KB after warmup"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Run tests
 # ------------------------------------------------------------------------------
 
@@ -2480,6 +2548,11 @@ run_test test_custom_action_function_exists
 run_test test_extensibility_config_loading
 run_test test_action_nonzero_exit
 run_test test_unload_cleans_extensibility
+
+# Performance tests
+run_test test_perf_load_time
+run_test test_perf_tokenize
+run_test test_perf_memory_no_leak
 
 print ""
 local actual_tests=$((TESTS_RUN - TESTS_SKIPPED))

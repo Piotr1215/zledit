@@ -731,18 +731,19 @@ zsh-jumper-unload() {
                _zsh_jumper_do_custom_action \
                _zsh_jumper_adapter_fzf _zsh_jumper_adapter_fzf-tmux \
                _zsh_jumper_adapter_sk _zsh_jumper_adapter_peco \
-               _zsh_jumper_adapter_percol _zsh_jumper_extract_index \
+               _zsh_jumper_adapter_percol _zsh_jumper_adapter_fzflike \
+               _zsh_jumper_adapter_simple _zsh_jumper_extract_index \
                _zsh_jumper_build_overlay _zsh_jumper_hint_to_index \
-               _zsh_jumper_build_preview_cmd \
+               _zsh_jumper_highlight_hints _zsh_jumper_build_preview_cmd \
                _zsh_jumper_parse_toml _zsh_jumper_save_toml_item \
                zsh-jumper-setup-bindings zsh-jumper-list zsh-jumper-unload 2>/dev/null
 
     unset '_zj_words' '_zj_positions' '_zj_result_key' '_zj_result_selection' \
           '_zj_invoke_prompt' '_zj_invoke_header' '_zj_invoke_binds' \
-          '_zj_invoke_preview_args' 'ZshJumper[dir]' \
+          '_zj_invoke_preview_args' '_zj_hint_keys' \
           '_zj_previewer_patterns' '_zj_previewer_descriptions' '_zj_previewer_scripts' \
           '_zj_action_bindings' '_zj_action_descriptions' '_zj_action_scripts'
-    (( ${#ZshJumper} == 0 )) && unset ZshJumper
+    unset ZshJumper
 
     return 0
 }
