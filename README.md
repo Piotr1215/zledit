@@ -9,23 +9,24 @@ $ kubectl get pods -n kube-system --output wide
                     ▲
               [Ctrl+X /]
                     │
-  ┌─────────────────┴─────────────────────────────────────┐
-  │ [a]kubectl [s]get [d]pods [f]-n [g]kube-system ...    │  ← overlay hints
-  ├───────────────────────────────────────────────────────┤
-  │      jump>                                            │
-  │    1: kubectl                                         │
-  │    2: get                                             │
-  │>   3: pods                                            │
-  │    4: -n                                              │
-  │    5: kube-system                                     │
-  │    6: --output                                        │
-  │    7: wide                                            │
-  └───────────────────────────────────────────────────────┘
+→ [a]kubectl [s]get [d]pods [f]-n [g]kube-system [h]--output [j]wide   ← overlay
+┌─────────────────────────────────────┬────────────────────────────────────────┐
+│ jump>                               │ kubectl controls the Kubernetes...     │
+│ ^S:wrap | ^E:var | ^R:replace | ^M:m|                                        │
+│─────────────────────────────────────│                                        │
+│> 1: kubectl                         │ Basic Commands (Beginner):             │
+│  2: get                             │   create    Create a resource          │
+│  3: pods                            │   expose    Expose a resource          │
+│  4: -n                              │   run       Run a particular image     │
+│  5: kube-system                     │   set       Set specific features      │
+│  6: --output                        │                                        │
+│  7: wide                            │ Basic Commands (Intermediate):         │
+└─────────────────────────────────────┴────────────────────────────────────────┘
 ```
 
-The overlay on the command line shows `[a]kubectl [s]get [d]pods` - letter hints for instant jump. The picker shows numbered items for fuzzy search.
+The overlay shows letter hints (`[a]kubectl [s]get [d]pods`) for instant jump. The picker has numbered items for fuzzy search, with `--help` preview on the right.
 
-Press `;` to enter **instant mode**: then press a letter key (a, s, d...) to jump immediately to that word.
+Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump directly to that word.
 
 ## Features
 
@@ -36,9 +37,9 @@ Press `;` to enter **instant mode**: then press a letter key (a, s, d...) to jum
 - **Configurable**: Custom keybindings, picker options via zstyle
 - **Fast**: ~0.2ms load time (see [Performance](#performance))
 - **Wrap/Surround**: Wrap tokens in quotes, brackets, or command substitution
-- **Help integration**: Show help for selected flags or commands
+- **Move/Swap**: Swap token positions via secondary picker
 - **Variable extraction**: Convert tokens to shell variables
-- **Path preview**: Preview file/directory contents in fzf panel
+- **Smart preview**: Command help (`--help`/`tldr`/`man`), file contents, directory listings
 
 ## Requirements
 
@@ -101,9 +102,9 @@ With FZF, additional actions available via key combos (shown in header):
 |-----|--------|
 | `Enter` | Jump to selected token |
 | `Ctrl+S` | Wrap token in `"..."`, `'...'`, `$(...)`, etc. |
-| `Ctrl+H` | Show `--help` for selected flag/command |
 | `Ctrl+E` | Extract token to `UPPERCASE` variable (uses push-line) |
-| `Ctrl+R` | Replace token (delete and position cursor for typing with tab completion) |
+| `Ctrl+R` | Replace token (delete and position cursor for typing) |
+| `Ctrl+M` | Move/swap token with another position |
 | `;` | Enter instant mode (then press a-z to jump) |
 
 **Tip**: `Ctrl+R` deletes the token and leaves cursor in place - you get full zsh tab completion for the replacement text.
@@ -115,9 +116,9 @@ Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in th
 **Custom FZF keys** (if defaults conflict with your setup):
 ```zsh
 zstyle ':zsh-jumper:' fzf-wrap-key 'ctrl-s'
-zstyle ':zsh-jumper:' fzf-help-key 'ctrl-h'
 zstyle ':zsh-jumper:' fzf-var-key 'ctrl-e'
 zstyle ':zsh-jumper:' fzf-replace-key 'ctrl-r'
+zstyle ':zsh-jumper:' fzf-move-key 'ctrl-m'
 zstyle ':zsh-jumper:' fzf-instant-key ';'    # key to enter instant mode
 ```
 
@@ -126,9 +127,15 @@ zstyle ':zsh-jumper:' fzf-instant-key ';'    # key to enter instant mode
 zstyle ':zsh-jumper:' overlay off
 ```
 
-### Path Preview (FZF only)
+### Preview Panel (FZF only)
 
-File/directory tokens show a preview panel (`bat` with fallback to `head`). Extracts paths from `VAR=/path` format.
+The preview panel shows contextual information:
+
+- **Commands**: `--help` output (with `bat` syntax highlighting), fallback to `tldr`, then `man`
+- **Files**: Content preview via `bat` (or `head`)
+- **Directories**: `ls -la` listing
+
+Scroll preview with `Ctrl+D` / `Ctrl+U`.
 
 ```zsh
 zstyle ':zsh-jumper:' preview off              # disable
@@ -244,6 +251,8 @@ script = '~/.config/zsh-jumper/scripts/uppercase.sh'
 ```
 
 User-defined actions override built-in defaults when bindings collide.
+
+**Introspection**: Run `zsh-jumper-list` to see all registered actions and previewers.
 
 See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts, and [docs/design.md](docs/design.md) for the technical reference.
 
