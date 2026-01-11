@@ -101,12 +101,10 @@ test_default_actions_loaded() {
     local result
     result=$(zsh -c "
         source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        # Check that default actions are registered
-        (( \${#_zj_action_bindings[@]} >= 5 )) || exit 1
-        (( \${#_zj_action_scripts[@]} >= 5 )) || exit 1
-        # Verify wrap, help, var, replace, move are registered
+        # Check that default actions are registered (wrap, var, replace, move)
+        (( \${#_zj_action_bindings[@]} >= 4 )) || exit 1
+        (( \${#_zj_action_scripts[@]} >= 4 )) || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *wrap* ]] || exit 1
-        [[ \"\${_zj_action_descriptions[*]}\" == *help* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *var* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *replace* ]] || exit 1
         [[ \"\${_zj_action_descriptions[*]}\" == *move* ]] || exit 1
@@ -121,7 +119,6 @@ test_default_actions_loaded() {
 test_action_scripts_exist() {
     local missing=""
     [[ ! -x "$PLUGIN_DIR/actions/wrap.sh" ]] && missing+=" wrap.sh"
-    [[ ! -x "$PLUGIN_DIR/actions/help.sh" ]] && missing+=" help.sh"
     [[ ! -x "$PLUGIN_DIR/actions/var.sh" ]] && missing+=" var.sh"
     [[ ! -x "$PLUGIN_DIR/actions/replace.sh" ]] && missing+=" replace.sh"
     [[ ! -x "$PLUGIN_DIR/actions/move.sh" ]] && missing+=" move.sh"

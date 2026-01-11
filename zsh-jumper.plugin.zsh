@@ -105,7 +105,6 @@ _zsh_jumper_load_default_actions() {
     # Format: binding:description:script
     local -a defaults=(
         "${ZshJumper[wrap-key]}:wrap:${dir}/wrap.sh"
-        "${ZshJumper[help-key]}:help:${dir}/help.sh"
         "${ZshJumper[var-key]}:var:${dir}/var.sh"
         "${ZshJumper[replace-key]}:replace:${dir}/replace.sh"
         "${ZshJumper[move-key]}:move:${dir}/move.sh"
@@ -143,7 +142,6 @@ _zsh_jumper_load_config() {
 
     # FZF action keys
     zstyle -s ':zsh-jumper:' fzf-wrap-key val; ZshJumper[wrap-key]="${val:-ctrl-s}"
-    zstyle -s ':zsh-jumper:' fzf-help-key val; ZshJumper[help-key]="${val:-ctrl-h}"
     zstyle -s ':zsh-jumper:' fzf-var-key val; ZshJumper[var-key]="${val:-ctrl-e}"
     zstyle -s ':zsh-jumper:' fzf-replace-key val; ZshJumper[replace-key]="${val:-ctrl-r}"
     zstyle -s ':zsh-jumper:' fzf-move-key val; ZshJumper[move-key]="${val:-ctrl-m}"
@@ -472,6 +470,8 @@ zsh-jumper-widget() {
         # Letter keys unbound initially; instant-key rebinds them for direct jump
         binds+=",start:unbind($unbinds)"
         binds+=",${ik}:rebind($rebinds)"
+        # Preview scroll
+        binds+=",ctrl-d:preview-page-down,ctrl-u:preview-page-up"
 
         if [[ "${ZshJumper[preview]}" != "off" ]]; then
             _zsh_jumper_build_preview_cmd
