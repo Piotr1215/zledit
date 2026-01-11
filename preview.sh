@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zsh-jumper preview handler
+# zledit preview handler
 set -eo pipefail
 
 TOKEN="$1"

@@ -16,7 +16,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zsh
 
       - name: Syntax check
-        run: zsh -n zsh-jumper.plugin.zsh
+        run: zsh -n zledit.plugin.zsh
 
   test:
     runs-on: ${{ matrix.os }}
@@ -54,7 +54,7 @@ jobs:
         run: brew install ${{ matrix.picker }}
 
       - name: Verify zsh syntax
-        run: zsh -n zsh-jumper.plugin.zsh
+        run: zsh -n zledit.plugin.zsh
 
       - name: Run tests
         run: zsh tests/test_plugin.zsh
@@ -70,9 +70,9 @@ jobs:
       - name: Test graceful handling without picker
         run: |
           zsh -c '
-            source ./zsh-jumper.plugin.zsh
-            [[ -z "${ZshJumper[picker]}" ]] && echo "Correctly empty when no picker" && exit 0
-            echo "Unexpected: ${ZshJumper[picker]}"
+            source ./zledit.plugin.zsh
+            [[ -z "${Zledit[picker]}" ]] && echo "Correctly empty when no picker" && exit 0
+            echo "Unexpected: ${Zledit[picker]}"
             exit 1
           '
 
@@ -92,7 +92,7 @@ jobs:
           # Load time
           load_ms=$(zsh -c "
             start=\$(date +%s%N)
-            source ./zsh-jumper.plugin.zsh
+            source ./zledit.plugin.zsh
             end=\$(date +%s%N)
             echo \$(( (end - start) / 1000000 ))
           ")
@@ -100,10 +100,10 @@ jobs:
 
           # Tokenize 100x
           tok_ms=$(zsh -c "
-            source ./zsh-jumper.plugin.zsh
+            source ./zledit.plugin.zsh
             BUFFER='kubectl get pods -n default -o wide --show-labels'
             start=\$(date +%s%N)
-            for i in {1..100}; do _zsh_jumper_tokenize; done
+            for i in {1..100}; do _zledit_tokenize; done
             end=\$(date +%s%N)
             echo \$(( (end - start) / 1000000 ))
           ")
@@ -111,9 +111,9 @@ jobs:
 
           # Memory (after warmup)
           mem_kb=$(zsh -c "
-            for i in {1..5}; do source ./zsh-jumper.plugin.zsh; zsh-jumper-unload; done
+            for i in {1..5}; do source ./zledit.plugin.zsh; zledit-unload; done
             mem1=\$(ps -o rss= -p \$\$)
-            for i in {1..10}; do source ./zsh-jumper.plugin.zsh; zsh-jumper-unload; done
+            for i in {1..10}; do source ./zledit.plugin.zsh; zledit-unload; done
             mem2=\$(ps -o rss= -p \$\$)
             echo \$((mem2 - mem1))
           ")
@@ -124,7 +124,7 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ secrets.PERF_GIST_ID }}
-          filename: zsh-jumper-load.json
+          filename: zledit-load.json
           label: load
           message: ${{ steps.perf.outputs.load_ms }}ms
           color: brightgreen
@@ -134,7 +134,7 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ secrets.PERF_GIST_ID }}
-          filename: zsh-jumper-tokenize.json
+          filename: zledit-tokenize.json
           label: parse
           message: ${{ steps.perf.outputs.tok_ms }}ms
           color: brightgreen
@@ -144,7 +144,7 @@ jobs:
         with:
           auth: ${{ secrets.GIST_TOKEN }}
           gistID: ${{ secrets.PERF_GIST_ID }}
-          filename: zsh-jumper-memory.json
+          filename: zledit-memory.json
           label: leak
           message: +${{ steps.perf.outputs.mem_kb }}KB
           color: brightgreen

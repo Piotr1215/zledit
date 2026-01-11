@@ -1,6 +1,6 @@
 # Design Principles
 
-Engineering notes on zsh-jumper's architecture.
+Engineering notes on zledit's architecture.
 
 ## Core Philosophy
 
@@ -12,7 +12,7 @@ The tokenizer, position tracking, and buffer manipulation are pure zsh - no exte
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   zsh-jumper-widget                 │
+│                   zledit-widget                 │
 │         (orchestration, overlay, instant mode)      │
 └─────────────────────┬───────────────────────────────┘
                       │
@@ -37,12 +37,12 @@ The tokenizer, position tracking, and buffer manipulation are pure zsh - no exte
 
 ## Configuration
 
-Config read once at plugin load, stored in `ZshJumper` associative array:
+Config read once at plugin load, stored in `Zledit` associative array:
 
 ```zsh
-_zsh_jumper_load_config() {
-    zstyle -s ':zsh-jumper:' overlay val; ZshJumper[overlay]="${val:-on}"
-    zstyle -s ':zsh-jumper:' fzf-wrap-key val; ZshJumper[wrap-key]="${val:-ctrl-s}"
+_zledit_load_config() {
+    zstyle -s ':zledit:' overlay val; Zledit[overlay]="${val:-on}"
+    zstyle -s ':zledit:' fzf-wrap-key val; Zledit[wrap-key]="${val:-ctrl-s}"
     # ... etc
 }
 ```
@@ -54,15 +54,15 @@ _zsh_jumper_load_config() {
 Each adapter implements the same interface:
 
 ```zsh
-# Input: stdin (items), _zj_invoke_* variables (config)
-# Output: _zj_result_key (action), _zj_result_selection (item)
+# Input: stdin (items), _ze_invoke_* variables (config)
+# Output: _ze_result_key (action), _ze_result_selection (item)
 # Return: 0 success, 1 cancelled
 
-_zsh_jumper_adapter_fzf()
-_zsh_jumper_adapter_fzf-tmux()
-_zsh_jumper_adapter_sk()
-_zsh_jumper_adapter_peco()
-_zsh_jumper_adapter_percol()
+_zledit_adapter_fzf()
+_zledit_adapter_fzf-tmux()
+_zledit_adapter_sk()
+_zledit_adapter_peco()
+_zledit_adapter_percol()
 ```
 
 Adding a new picker = implement one function.
@@ -72,7 +72,7 @@ Adding a new picker = implement one function.
 EasyMotion-style hints via `region_highlight`:
 
 ```zsh
-_zsh_jumper_highlight_hints() {
+_zledit_highlight_hints() {
     region_highlight=()
     # Find [x] patterns, add "fg=yellow,bold" highlighting
 }
@@ -121,16 +121,16 @@ Problems:
 Parse once, record positions during tokenization:
 
 ```zsh
-_zsh_jumper_tokenize() {
-    _zj_words=()
-    _zj_positions=()
+_zledit_tokenize() {
+    _ze_words=()
+    _ze_positions=()
 
     local i=0 word_start=-1 in_word=0
     while (( i < ${#BUFFER} )); do
         if [[ "${BUFFER:$i:1}" == [[:space:]] ]]; then
             if (( in_word )); then
-                _zj_words+=("${BUFFER:$word_start:$((i - word_start))}")
-                _zj_positions+=($word_start)
+                _ze_words+=("${BUFFER:$word_start:$((i - word_start))}")
+                _ze_positions+=($word_start)
                 in_word=0
             fi
         elif (( ! in_word )); then
@@ -145,7 +145,7 @@ _zsh_jumper_tokenize() {
 
 **Benefits:**
 - O(n) single pass
-- O(1) position lookup: `_zj_positions[$idx]`
+- O(1) position lookup: `_ze_positions[$idx]`
 - No pattern matching - handles all characters
 - Parallel arrays keep data aligned
 
@@ -163,18 +163,18 @@ _zsh_jumper_tokenize() {
 
 ## Action Design
 
-Actions receive only the selection string. They access `_zj_words` and `_zj_positions` directly:
+Actions receive only the selection string. They access `_ze_words` and `_ze_positions` directly:
 
 ```zsh
-_zsh_jumper_do_jump() {
+_zledit_do_jump() {
     local sel="$1"
     local idx="${sel%%:*}"
 
     # Bounds check
-    (( idx < 1 || idx > ${#_zj_words[@]} )) && return 1
+    (( idx < 1 || idx > ${#_ze_words[@]} )) && return 1
 
     # Direct lookup - O(1)
-    local pos="${_zj_positions[$idx]}"
+    local pos="${_ze_positions[$idx]}"
     CURSOR=$pos
 }
 ```
@@ -197,10 +197,10 @@ Tests covering:
 Tests run in isolated zsh subshells:
 ```zsh
 result=$(zsh -c '
-    source ./zsh-jumper.plugin.zsh
+    source ./zledit.plugin.zsh
     BUFFER="test input"
-    _zsh_jumper_tokenize
-    echo "${_zj_positions[1]}"
+    _zledit_tokenize
+    echo "${_ze_positions[1]}"
 ')
 ```
 
@@ -229,7 +229,7 @@ Where we deliberately do nothing:
 
 Invariants the widget relies on:
 - BUFFER is stable during widget execution
-- `_zj_words` and `_zj_positions` are aligned (same length)
+- `_ze_words` and `_ze_positions` are aligned (same length)
 - Positions are valid indices into current BUFFER
 
 ## Extensibility
@@ -241,7 +241,7 @@ Two extension points: **Previewers** (custom preview for token patterns) and **A
 Single config file for both previewers and actions:
 
 ```zsh
-zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
+zstyle ':zledit:' config ~/.config/zledit/config.toml
 ```
 
 ### TOML Parser
@@ -252,7 +252,7 @@ Minimal subset parser (no external dependencies):
 - `#` comments
 
 ```zsh
-_zsh_jumper_parse_toml() {
+_zledit_parse_toml() {
     # Reads file line-by-line
     # Extracts [[previewers]] and [[actions]] blocks
     # Returns: count:pattern1:desc1:script1:pattern2:desc2:script2:...
@@ -267,7 +267,7 @@ Match token against regex patterns, run first matching script.
 [[previewers]]
 pattern = '^https?://'
 description = 'URL preview'
-script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+script = '~/.config/zledit/scripts/url-preview.sh'
 
 [[previewers]]
 pattern = '\.(json|yaml|yml)$'
@@ -287,7 +287,7 @@ Custom scripts triggered by FZF key bindings. User-defined actions override buil
 [[actions]]
 binding = 'ctrl-u'
 description = 'upper'
-script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+script = '~/.config/zledit/scripts/uppercase.sh'
 ```
 
 **Script Interface:**

@@ -4,10 +4,10 @@ Step-by-step guide for writing custom previewers and actions.
 
 ## How It Works
 
-Place your config file anywhere. Point zsh-jumper to it via zstyle:
+Place your config file anywhere. Point zledit to it via zstyle:
 
 ```zsh
-zstyle ':zsh-jumper:' config /path/to/config.toml
+zstyle ':zledit:' config /path/to/config.toml
 ```
 
 The plugin loads your config at startup and registers previewers and actions in the order they appear. User-defined bindings take precedence over built-in defaults.
@@ -254,10 +254,10 @@ Built-in defaults load after user config, skipping any binding already registere
 
 Enable debug mode:
 ```zsh
-zstyle ':zsh-jumper:' debug on
+zstyle ':zledit:' debug on
 ```
 
-Logs go to `/tmp/zsh-jumper-debug.log`.
+Logs go to `/tmp/zledit-debug.log`.
 
 Test scripts manually:
 ```bash

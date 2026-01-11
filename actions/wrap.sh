@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zsh-jumper action: wrap (wrap token with quotes/brackets)
+# zledit action: wrap (wrap token with quotes/brackets)
 # Args: $1 = token, $2 = index (1-based)
 # Env:  ZJ_BUFFER, ZJ_POSITIONS, ZJ_PICKER (optional: fzf-tmux, fzf, sk)
 # Output: new buffer with wrapped token

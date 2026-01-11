@@ -1,29 +1,29 @@
 #!/usr/bin/env zsh
-# zsh-jumper - Jump to any word on the current line via fuzzy picker
-# https://github.com/decoder/zsh-jumper
+# zledit - Jump to any word on the current line via fuzzy picker
+# https://github.com/decoder/zledit
 
 # Standardized $0 handling (Zsh Plugin Standard)
 0="${ZERO:-${${0:#$ZSH_ARGZERO}:-${(%):-%N}}}"
 0="${${(M)0:#/*}:-$PWD/$0}"
 
-typeset -gA ZshJumper
-ZshJumper[dir]="${0:h}"
+typeset -gA Zledit
+Zledit[dir]="${0:h}"
 
 # ------------------------------------------------------------------------------
 # Configuration (read once at load time)
 # ------------------------------------------------------------------------------
 # Configure via zstyle BEFORE loading the plugin:
-#   zstyle ':zsh-jumper:' picker fzf
-#   zstyle ':zsh-jumper:' picker-opts '--height=10 --reverse'
-#   zstyle ':zsh-jumper:' disable-bindings yes
-#   zstyle ':zsh-jumper:' preview off
-#   zstyle ':zsh-jumper:' preview-window 'right:50%:wrap'
+#   zstyle ':zledit:' picker fzf
+#   zstyle ':zledit:' picker-opts '--height=10 --reverse'
+#   zstyle ':zledit:' disable-bindings yes
+#   zstyle ':zledit:' preview off
+#   zstyle ':zledit:' preview-window 'right:50%:wrap'
 # ------------------------------------------------------------------------------
 
-typeset -ga _zj_previewer_patterns _zj_previewer_descriptions _zj_previewer_scripts
-typeset -ga _zj_action_bindings _zj_action_descriptions _zj_action_scripts
+typeset -ga _ze_previewer_patterns _ze_previewer_descriptions _ze_previewer_scripts
+typeset -ga _ze_action_bindings _ze_action_descriptions _ze_action_scripts
 
-_zsh_jumper_parse_toml() {
+_zledit_parse_toml() {
     emulate -L zsh
     local file="$1" target_array="$2"
     [[ ! -f "$file" ]] && return 1
@@ -35,21 +35,21 @@ _zsh_jumper_parse_toml() {
     # Clear output arrays based on target
     case "$target_array" in
         previewers)
-            _zj_previewer_patterns=()
-            _zj_previewer_descriptions=()
-            _zj_previewer_scripts=()
+            _ze_previewer_patterns=()
+            _ze_previewer_descriptions=()
+            _ze_previewer_scripts=()
             ;;
         actions)
-            _zj_action_bindings=()
-            _zj_action_descriptions=()
-            _zj_action_scripts=()
+            _ze_action_bindings=()
+            _ze_action_descriptions=()
+            _ze_action_scripts=()
             ;;
     esac
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ -z "${line// /}" || "$line" == \#* ]] && continue
         if [[ "$line" =~ '^\[\[([a-zA-Z_]+)\]\]' ]]; then
-            (( in_target )) && _zsh_jumper_save_toml_item "$target_array"
+            (( in_target )) && _zledit_save_toml_item "$target_array"
             if [[ "${match[1]}" == "$target_array" ]]; then
                 in_target=1; current_item=()
             else
@@ -67,29 +67,29 @@ _zsh_jumper_parse_toml() {
             current_item[$key]="$value"
         fi
     done < "$file"
-    (( in_target )) && _zsh_jumper_save_toml_item "$target_array"
+    (( in_target )) && _zledit_save_toml_item "$target_array"
     return 0
 }
 
-_zsh_jumper_save_toml_item() {
+_zledit_save_toml_item() {
     local target="$1"
     case "$target" in
         previewers)
             [[ -n "${current_item[pattern]}" && -n "${current_item[script]}" ]] && {
-                _zj_previewer_patterns+=("${current_item[pattern]}")
-                _zj_previewer_descriptions+=("${current_item[description]:-custom}")
+                _ze_previewer_patterns+=("${current_item[pattern]}")
+                _ze_previewer_descriptions+=("${current_item[description]:-custom}")
                 local script="${current_item[script]}"
                 [[ "$script" == "~"* ]] && script="$HOME${script#"~"}"
-                _zj_previewer_scripts+=("$script")
+                _ze_previewer_scripts+=("$script")
             }
             ;;
         actions)
             [[ -n "${current_item[binding]}" && -n "${current_item[script]}" ]] && {
-                _zj_action_bindings+=("${current_item[binding]}")
-                _zj_action_descriptions+=("${current_item[description]:-custom}")
+                _ze_action_bindings+=("${current_item[binding]}")
+                _ze_action_descriptions+=("${current_item[description]:-custom}")
                 local script="${current_item[script]}"
                 [[ "$script" == "~"* ]] && script="$HOME${script#"~"}"
-                _zj_action_scripts+=("$script")
+                _ze_action_scripts+=("$script")
             }
             ;;
     esac
@@ -97,17 +97,17 @@ _zsh_jumper_save_toml_item() {
 }
 
 # Load default built-in actions from plugin's actions/ directory
-_zsh_jumper_load_default_actions() {
+_zledit_load_default_actions() {
     emulate -L zsh
-    local dir="${ZshJumper[dir]}/actions"
+    local dir="${Zledit[dir]}/actions"
 
     # Default actions with their configured keybindings
     # Format: binding:description:script
     local -a defaults=(
-        "${ZshJumper[wrap-key]}:wrap:${dir}/wrap.sh"
-        "${ZshJumper[var-key]}:var:${dir}/var.sh"
-        "${ZshJumper[replace-key]}:replace:${dir}/replace.sh"
-        "${ZshJumper[move-key]}:move:${dir}/move.sh"
+        "${Zledit[wrap-key]}:wrap:${dir}/wrap.sh"
+        "${Zledit[var-key]}:var:${dir}/var.sh"
+        "${Zledit[replace-key]}:replace:${dir}/replace.sh"
+        "${Zledit[move-key]}:move:${dir}/move.sh"
     )
 
     local entry binding desc script
@@ -121,168 +121,168 @@ _zsh_jumper_load_default_actions() {
         [[ ! -x "$script" ]] && continue
 
         # Check if binding already registered by user config (skip if already in array)
-        (( ${_zj_action_bindings[(Ie)$binding]} )) && continue
+        (( ${_ze_action_bindings[(Ie)$binding]} )) && continue
 
-        _zj_action_bindings+=("$binding")
-        _zj_action_descriptions+=("$desc")
-        _zj_action_scripts+=("$script")
+        _ze_action_bindings+=("$binding")
+        _ze_action_descriptions+=("$desc")
+        _ze_action_scripts+=("$script")
     done
 }
 
-_zsh_jumper_load_config() {
+_zledit_load_config() {
     emulate -L zsh
     local val
 
-    # Read all zstyle config once and store in ZshJumper array
-    zstyle -s ':zsh-jumper:' overlay val; ZshJumper[overlay]="${val:-on}"
-    zstyle -s ':zsh-jumper:' preview val; ZshJumper[preview]="${val:-on}"
-    zstyle -s ':zsh-jumper:' preview-window val; ZshJumper[preview-window]="${val:-right:50%:wrap}"
-    zstyle -s ':zsh-jumper:' cursor val; ZshJumper[cursor]="${val:-start}"
-    zstyle -s ':zsh-jumper:' picker-opts val; ZshJumper[picker-opts]="$val"
+    # Read all zstyle config once and store in Zledit array
+    zstyle -s ':zledit:' overlay val; Zledit[overlay]="${val:-on}"
+    zstyle -s ':zledit:' preview val; Zledit[preview]="${val:-on}"
+    zstyle -s ':zledit:' preview-window val; Zledit[preview-window]="${val:-right:50%:wrap}"
+    zstyle -s ':zledit:' cursor val; Zledit[cursor]="${val:-start}"
+    zstyle -s ':zledit:' picker-opts val; Zledit[picker-opts]="$val"
 
     # FZF action keys
-    zstyle -s ':zsh-jumper:' fzf-wrap-key val; ZshJumper[wrap-key]="${val:-ctrl-s}"
-    zstyle -s ':zsh-jumper:' fzf-var-key val; ZshJumper[var-key]="${val:-ctrl-e}"
-    zstyle -s ':zsh-jumper:' fzf-replace-key val; ZshJumper[replace-key]="${val:-ctrl-r}"
-    zstyle -s ':zsh-jumper:' fzf-move-key val; ZshJumper[move-key]="${val:-ctrl-t}"
-    zstyle -s ':zsh-jumper:' fzf-instant-key val; ZshJumper[instant-key]="${val:-;}"
-    zstyle -s ':zsh-jumper:' debug val; ZshJumper[debug]="${val:-off}"
+    zstyle -s ':zledit:' fzf-wrap-key val; Zledit[wrap-key]="${val:-ctrl-s}"
+    zstyle -s ':zledit:' fzf-var-key val; Zledit[var-key]="${val:-ctrl-e}"
+    zstyle -s ':zledit:' fzf-replace-key val; Zledit[replace-key]="${val:-ctrl-r}"
+    zstyle -s ':zledit:' fzf-move-key val; Zledit[move-key]="${val:-ctrl-t}"
+    zstyle -s ':zledit:' fzf-instant-key val; Zledit[instant-key]="${val:-;}"
+    zstyle -s ':zledit:' debug val; Zledit[debug]="${val:-off}"
 
     # Extensibility config - unified or separate files
-    zstyle -s ':zsh-jumper:' config val
+    zstyle -s ':zledit:' config val
     if [[ -n "$val" ]]; then
         [[ "$val" == "~"* ]] && val="$HOME${val#"~"}"
-        _zsh_jumper_parse_toml "$val" previewers
-        _zsh_jumper_parse_toml "$val" actions
+        _zledit_parse_toml "$val" previewers
+        _zledit_parse_toml "$val" actions
     else
-        zstyle -s ':zsh-jumper:' previewer-config val
+        zstyle -s ':zledit:' previewer-config val
         [[ -n "$val" ]] && {
             [[ "$val" == "~"* ]] && val="$HOME${val#"~"}"
-            _zsh_jumper_parse_toml "$val" previewers
+            _zledit_parse_toml "$val" previewers
         }
-        zstyle -s ':zsh-jumper:' action-config val
+        zstyle -s ':zledit:' action-config val
         [[ -n "$val" ]] && {
             [[ "$val" == "~"* ]] && val="$HOME${val#"~"}"
-            _zsh_jumper_parse_toml "$val" actions
+            _zledit_parse_toml "$val" actions
         }
     fi
 
     # Detect picker (prefer explicit config, then auto-detect)
-    zstyle -s ':zsh-jumper:' picker val
+    zstyle -s ':zledit:' picker val
     if [[ -n "$val" ]]; then
-        (( $+commands[$val] )) && ZshJumper[picker]="$val"
+        (( $+commands[$val] )) && Zledit[picker]="$val"
     elif [[ -n "$TMUX" ]] && (( $+commands[fzf-tmux] )); then
-        ZshJumper[picker]="fzf-tmux"
+        Zledit[picker]="fzf-tmux"
     elif (( $+commands[fzf] )); then
-        ZshJumper[picker]="fzf"
+        Zledit[picker]="fzf"
     elif (( $+commands[sk] )); then
-        ZshJumper[picker]="sk"
+        Zledit[picker]="sk"
     elif (( $+commands[peco] )); then
-        ZshJumper[picker]="peco"
+        Zledit[picker]="peco"
     elif (( $+commands[percol] )); then
-        ZshJumper[picker]="percol"
+        Zledit[picker]="percol"
     fi
 
     # Load default actions (after user config, so user can override)
-    _zsh_jumper_load_default_actions
+    _zledit_load_default_actions
 }
 
-_zsh_jumper_load_config
+_zledit_load_config
 
 # Result variables (set by adapters)
-typeset -g _zj_result_key _zj_result_selection
+typeset -g _ze_result_key _ze_result_selection
 
 # ------------------------------------------------------------------------------
 # Picker Adapters (Ports & Adapters pattern)
 # ------------------------------------------------------------------------------
 # Each adapter implements the same interface:
-#   Input:  items via stdin, config via _zj_invoke_* variables
-#   Output: _zj_result_key (action), _zj_result_selection (chosen item)
+#   Input:  items via stdin, config via _ze_invoke_* variables
+#   Output: _ze_result_key (action), _ze_result_selection (chosen item)
 #   Return: 0 = success, 1 = cancelled/error
 # ------------------------------------------------------------------------------
 
 # Shared helper for fzf-like pickers (fzf, fzf-tmux, sk)
 # Args: $1=command, $2=height (empty for fzf-tmux which uses tmux pane)
-_zsh_jumper_adapter_fzflike() {
+_zledit_adapter_fzflike() {
     local cmd="$1"
     local -a base_opts=(${2:+--height=$2} --reverse)
-    [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts+=(${(z)ZshJumper[picker-opts]})
+    [[ -n "${Zledit[picker-opts]}" ]] && base_opts+=(${(z)Zledit[picker-opts]})
 
-    [[ "${ZshJumper[debug]}" == "on" ]] && {
-        echo "FZF: $cmd ${base_opts[*]} prompt=${_zj_invoke_prompt}" >> /tmp/zsh-jumper-debug.log
+    [[ "${Zledit[debug]}" == "on" ]] && {
+        echo "FZF: $cmd ${base_opts[*]} prompt=${_ze_invoke_prompt}" >> /tmp/zledit-debug.log
     }
 
     local result
-    if [[ -n "$_zj_invoke_binds" ]]; then
+    if [[ -n "$_ze_invoke_binds" ]]; then
         result=$($cmd "${base_opts[@]}" \
-            --prompt="$_zj_invoke_prompt" \
-            --header="$_zj_invoke_header" \
-            --bind "$_zj_invoke_binds" \
-            "${_zj_invoke_preview_args[@]}")
-        _zj_result_key="${result%%$'\n'*}"
-        _zj_result_selection="${result#*$'\n'}"
+            --prompt="$_ze_invoke_prompt" \
+            --header="$_ze_invoke_header" \
+            --bind "$_ze_invoke_binds" \
+            "${_ze_invoke_preview_args[@]}")
+        _ze_result_key="${result%%$'\n'*}"
+        _ze_result_selection="${result#*$'\n'}"
     else
-        result=$($cmd "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
-        _zj_result_key=""
-        _zj_result_selection="$result"
+        result=$($cmd "${base_opts[@]}" --prompt="$_ze_invoke_prompt")
+        _ze_result_key=""
+        _ze_result_selection="$result"
     fi
-    [[ -n "$_zj_result_selection" ]]
+    [[ -n "$_ze_result_selection" ]]
 }
 
-_zsh_jumper_adapter_fzf() { _zsh_jumper_adapter_fzflike fzf 40%; }
-_zsh_jumper_adapter_fzf-tmux() { _zsh_jumper_adapter_fzflike fzf-tmux; }
-_zsh_jumper_adapter_sk() { _zsh_jumper_adapter_fzflike sk 40%; }
+_zledit_adapter_fzf() { _zledit_adapter_fzflike fzf 40%; }
+_zledit_adapter_fzf-tmux() { _zledit_adapter_fzflike fzf-tmux; }
+_zledit_adapter_sk() { _zledit_adapter_fzflike sk 40%; }
 
 # Shared helper for simple pickers (no bind support)
-_zsh_jumper_adapter_simple() {
+_zledit_adapter_simple() {
     local cmd="$1"
     local -a base_opts=()
-    [[ -n "${ZshJumper[picker-opts]}" ]] && base_opts=(${(z)ZshJumper[picker-opts]})
+    [[ -n "${Zledit[picker-opts]}" ]] && base_opts=(${(z)Zledit[picker-opts]})
 
-    _zj_result_key=""
-    _zj_result_selection=$($cmd "${base_opts[@]}" --prompt="$_zj_invoke_prompt")
-    [[ -n "$_zj_result_selection" ]]
+    _ze_result_key=""
+    _ze_result_selection=$($cmd "${base_opts[@]}" --prompt="$_ze_invoke_prompt")
+    [[ -n "$_ze_result_selection" ]]
 }
 
-_zsh_jumper_adapter_peco() { _zsh_jumper_adapter_simple peco; }
-_zsh_jumper_adapter_percol() { _zsh_jumper_adapter_simple percol; }
+_zledit_adapter_peco() { _zledit_adapter_simple peco; }
+_zledit_adapter_percol() { _zledit_adapter_simple percol; }
 
 # ------------------------------------------------------------------------------
 # Port: Unified Picker Interface
 # ------------------------------------------------------------------------------
 # Usage:
-#   printf '%s\n' "${items[@]}" | _zsh_jumper_invoke_picker <picker> <prompt> [header] [binds] [preview_args...]
+#   printf '%s\n' "${items[@]}" | _zledit_invoke_picker <picker> <prompt> [header] [binds] [preview_args...]
 # Returns:
-#   _zj_result_key - action key (empty for basic selection)
-#   _zj_result_selection - selected item(s)
+#   _ze_result_key - action key (empty for basic selection)
+#   _ze_result_selection - selected item(s)
 # ------------------------------------------------------------------------------
 
-_zsh_jumper_invoke_picker() {
+_zledit_invoke_picker() {
     local picker="$1" prompt="$2" header="$3" binds="$4"
     shift 4
     local -a preview_args=("$@")
 
     # Set invocation context for adapter
-    _zj_invoke_prompt="$prompt"
-    _zj_invoke_header="$header"
-    _zj_invoke_binds="$binds"
-    _zj_invoke_preview_args=("${preview_args[@]}")
+    _ze_invoke_prompt="$prompt"
+    _ze_invoke_header="$header"
+    _ze_invoke_binds="$binds"
+    _ze_invoke_preview_args=("${preview_args[@]}")
 
     # Clear results
-    _zj_result_key=""
-    _zj_result_selection=""
+    _ze_result_key=""
+    _ze_result_selection=""
 
     # Dispatch to adapter
-    local adapter_fn="_zsh_jumper_adapter_${picker}"
+    local adapter_fn="_zledit_adapter_${picker}"
     if (( $+functions[$adapter_fn] )); then
         $adapter_fn
     else
-        echo "zsh-jumper: unknown picker '$picker'" >&2
+        echo "zledit: unknown picker '$picker'" >&2
         return 1
     fi
 }
 
-_zsh_jumper_supports_binds() {
+_zledit_supports_binds() {
     [[ "$1" == fzf* || "$1" == sk ]]
 }
 
@@ -291,14 +291,14 @@ _zsh_jumper_supports_binds() {
 # ------------------------------------------------------------------------------
 
 # Hint keys: home row first, then top row, then bottom
-typeset -ga _zj_hint_keys=(a s d f g h j k l q w e r t y u i o p z x c v b n m)
+typeset -ga _ze_hint_keys=(a s d f g h j k l q w e r t y u i o p z x c v b n m)
 
-_zsh_jumper_build_overlay() {
+_zledit_build_overlay() {
     local -a hints=(a s d f g h j k l q w e r t y u i o p z x c v b n m)
     local i=1 pos word last_end=0 result=""
-    while (( i <= ${#_zj_words[@]} )); do
-        pos=${_zj_positions[$i]}
-        word=${_zj_words[$i]}
+    while (( i <= ${#_ze_words[@]} )); do
+        pos=${_ze_positions[$i]}
+        word=${_ze_words[$i]}
         result+="${BUFFER:$last_end:$((pos - last_end))}"
         (( i <= ${#hints[@]} )) && result+="[${hints[$i]}]${word}" || result+="[${i}]${word}"
         last_end=$((pos + ${#word}))
@@ -309,7 +309,7 @@ _zsh_jumper_build_overlay() {
 }
 
 # Highlight hint keys [a] [s] [27] etc with color via region_highlight
-_zsh_jumper_highlight_hints() {
+_zledit_highlight_hints() {
     region_highlight=()
     local i=0 len=${#BUFFER} j content
     while (( i < len )); do
@@ -336,10 +336,10 @@ _zsh_jumper_highlight_hints() {
 }
 
 # Map hint key back to word index
-_zsh_jumper_hint_to_index() {
+_zledit_hint_to_index() {
     local hint="$1" i
-    for i in {1..${#_zj_hint_keys[@]}}; do
-        [[ "${_zj_hint_keys[$i]}" == "$hint" ]] && { echo "$i"; return 0; }
+    for i in {1..${#_ze_hint_keys[@]}}; do
+        [[ "${_ze_hint_keys[$i]}" == "$hint" ]] && { echo "$i"; return 0; }
     done
     # Fallback: if it's a number, use directly
     [[ "$hint" =~ ^[0-9]+$ ]] && echo "$hint"
@@ -349,10 +349,10 @@ _zsh_jumper_hint_to_index() {
 # Tokenizer
 # ------------------------------------------------------------------------------
 
-_zsh_jumper_tokenize() {
+_zledit_tokenize() {
     emulate -L zsh
-    _zj_words=()
-    _zj_positions=()
+    _ze_words=()
+    _ze_positions=()
 
     local i=0 word_start=-1 in_word=0
     local len=${#BUFFER}
@@ -362,8 +362,8 @@ _zsh_jumper_tokenize() {
             if (( in_word )); then
                 local word="${BUFFER:$word_start:$((i - word_start))}"
                 [[ "$word" != "\\" ]] && {
-                    _zj_words+=("$word")
-                    _zj_positions+=($word_start)
+                    _ze_words+=("$word")
+                    _ze_positions+=($word_start)
                 }
                 in_word=0
             fi
@@ -377,24 +377,24 @@ _zsh_jumper_tokenize() {
     if (( in_word )); then
         local word="${BUFFER:$word_start}"
         [[ "$word" != "\\" ]] && {
-            _zj_words+=("$word")
-            _zj_positions+=($word_start)
+            _ze_words+=("$word")
+            _ze_positions+=($word_start)
         }
     fi
 }
 
 # Build preview command
 # Returns preview command string via REPLY
-_zsh_jumper_build_preview_cmd() {
+_zledit_build_preview_cmd() {
     emulate -L zsh
     # Simple approach: use external script to avoid quoting hell
-    local script="${ZshJumper[dir]}/preview.sh"
+    local script="${Zledit[dir]}/preview.sh"
     if [[ -x "$script" ]]; then
         # Inline env vars for fzf-tmux compatibility (tmux panes don't inherit exports)
         local env_prefix=""
-        if (( ${#_zj_previewer_patterns[@]} > 0 )); then
-            local patterns="${(pj:\n:)_zj_previewer_patterns}"
-            local scripts="${(pj:\n:)_zj_previewer_scripts}"
+        if (( ${#_ze_previewer_patterns[@]} > 0 )); then
+            local patterns="${(pj:\n:)_ze_previewer_patterns}"
+            local scripts="${(pj:\n:)_ze_previewer_scripts}"
             env_prefix="ZJ_PREVIEWER_PATTERNS=${(qq)patterns} ZJ_PREVIEWER_SCRIPTS=${(qq)scripts} "
         fi
         REPLY="${env_prefix}$script {}"
@@ -408,40 +408,40 @@ _zsh_jumper_build_preview_cmd() {
 # Main Widget
 # ------------------------------------------------------------------------------
 
-zsh-jumper-widget() {
+zledit-widget() {
     emulate -L zsh
     setopt local_options no_xtrace no_verbose
 
-    local picker="${ZshJumper[picker]}"
+    local picker="${Zledit[picker]}"
     if [[ -z "$picker" ]]; then
-        zle -M "zsh-jumper: no picker found (install fzf, sk, peco, or percol)"
+        zle -M "zledit: no picker found (install fzf, sk, peco, or percol)"
         return 1
     fi
 
-    _zsh_jumper_tokenize
-    [[ ${#_zj_words[@]} -eq 0 ]] && return 0
+    _zledit_tokenize
+    [[ ${#_ze_words[@]} -eq 0 ]] && return 0
 
     # Build numbered list for fzf (letters shown via overlay after instant-key)
     local -a numbered
     local i
-    for i in {1..${#_zj_words[@]}}; do
-        numbered+=("$i: ${_zj_words[$i]}")
+    for i in {1..${#_ze_words[@]}}; do
+        numbered+=("$i: ${_ze_words[$i]}")
     done
 
-    # Use pre-loaded config from ZshJumper array (no zstyle reads during widget)
+    # Use pre-loaded config from Zledit array (no zstyle reads during widget)
     local header="" binds=""
     local -a preview_args=()
 
-    if _zsh_jumper_supports_binds "$picker"; then
-        local ik=${ZshJumper[instant-key]}
+    if _zledit_supports_binds "$picker"; then
+        local ik=${Zledit[instant-key]}
 
         # Build header and bindings dynamically from action arrays
         local ai binding desc key_display
         local -a header_parts=()
-        for ai in {1..${#_zj_action_bindings[@]}}; do
-            binding="${_zj_action_bindings[$ai]}"
+        for ai in {1..${#_ze_action_bindings[@]}}; do
+            binding="${_ze_action_bindings[$ai]}"
             [[ -z "$binding" ]] && continue
-            desc="${_zj_action_descriptions[$ai]}"
+            desc="${_ze_action_descriptions[$ai]}"
             key_display="${binding#ctrl-}"
             [[ "$binding" == ctrl-* ]] && key_display="^${(U)key_display}"
             header_parts+=("${key_display}:${desc}")
@@ -461,9 +461,9 @@ zsh-jumper-widget() {
         binds="enter:print()+accept"
 
         # Add all action bindings (both built-in and custom use same mechanism)
-        for ai in {1..${#_zj_action_bindings[@]}}; do
-            [[ -z "${_zj_action_bindings[$ai]}" ]] && continue
-            binds+=",${_zj_action_bindings[$ai]}:print(action-${ai})+accept"
+        for ai in {1..${#_ze_action_bindings[@]}}; do
+            [[ -z "${_ze_action_bindings[$ai]}" ]] && continue
+            binds+=",${_ze_action_bindings[$ai]}:print(action-${ai})+accept"
         done
 
         binds+="$hint_binds"
@@ -473,10 +473,10 @@ zsh-jumper-widget() {
         # Preview scroll
         binds+=",ctrl-d:preview-page-down,ctrl-u:preview-page-up"
 
-        if [[ "${ZshJumper[preview]}" != "off" ]]; then
-            _zsh_jumper_build_preview_cmd
+        if [[ "${Zledit[preview]}" != "off" ]]; then
+            _zledit_build_preview_cmd
             local preview_cmd="$REPLY"
-            preview_args=(--preview "$preview_cmd" --preview-window "${ZshJumper[preview-window]}")
+            preview_args=(--preview "$preview_cmd" --preview-window "${Zledit[preview-window]}")
         fi
     fi
 
@@ -484,49 +484,49 @@ zsh-jumper-widget() {
     local saved_buffer="$BUFFER"
 
     # Show overlay on command line with highlighted hints
-    if [[ "${ZshJumper[overlay]}" != "off" ]]; then
-        _zsh_jumper_build_overlay
+    if [[ "${Zledit[overlay]}" != "off" ]]; then
+        _zledit_build_overlay
         BUFFER="$REPLY"
-        _zsh_jumper_highlight_hints
+        _zledit_highlight_hints
         zle -R
     fi
 
     # Invoke picker
     zle -I
-    printf '%s\n' "${numbered[@]}" | _zsh_jumper_invoke_picker "$picker" "jump> " "$header" "$binds" "${preview_args[@]}"
+    printf '%s\n' "${numbered[@]}" | _zledit_invoke_picker "$picker" "jump> " "$header" "$binds" "${preview_args[@]}"
 
     # Clear overlay line from terminal scrollback (move up, clear line)
-    [[ "${ZshJumper[overlay]}" != "off" ]] && print -n '\e[1A\e[2K'
+    [[ "${Zledit[overlay]}" != "off" ]] && print -n '\e[1A\e[2K'
 
     # Restore original buffer and clear highlights
     region_highlight=()
     BUFFER="$saved_buffer"
 
     # Handle instant hint keys (hint-a, hint-s, etc)
-    if [[ "$_zj_result_key" == hint-* ]]; then
-        local hint_char="${_zj_result_key#hint-}"
-        local hint_idx="$(_zsh_jumper_hint_to_index "$hint_char")"
-        if [[ -n "$hint_idx" ]] && (( hint_idx >= 1 && hint_idx <= ${#_zj_words[@]} )); then
-            _zsh_jumper_do_jump "${hint_idx}: ${_zj_words[$hint_idx]}"
+    if [[ "$_ze_result_key" == hint-* ]]; then
+        local hint_char="${_ze_result_key#hint-}"
+        local hint_idx="$(_zledit_hint_to_index "$hint_char")"
+        if [[ -n "$hint_idx" ]] && (( hint_idx >= 1 && hint_idx <= ${#_ze_words[@]} )); then
+            _zledit_do_jump "${hint_idx}: ${_ze_words[$hint_idx]}"
         fi
         zle reset-prompt
         return 0
     fi
 
-    [[ -z "$_zj_result_selection" ]] && { zle reset-prompt; return 0; }
+    [[ -z "$_ze_result_selection" ]] && { zle reset-prompt; return 0; }
 
     # Handle result based on action key
-    local -a selections=("${(@f)_zj_result_selection}")
+    local -a selections=("${(@f)_ze_result_selection}")
 
-    case "$_zj_result_key" in
+    case "$_ze_result_key" in
         action-*)
             # All actions (built-in and custom) use external scripts
-            local action_idx="${_zj_result_key#action-}"
-            _zsh_jumper_do_custom_action "$action_idx" "${selections[@]}"
+            local action_idx="${_ze_result_key#action-}"
+            _zledit_do_custom_action "$action_idx" "${selections[@]}"
             ;;
         *)
             # Default: jump to selection
-            _zsh_jumper_do_jump "${selections[@]}"
+            _zledit_do_jump "${selections[@]}"
             ;;
     esac
 
@@ -539,30 +539,30 @@ zsh-jumper-widget() {
 
 # Extract index from selection format: "a: word" or "123: word"
 # Returns numeric index (1-based)
-_zsh_jumper_extract_index() {
+_zledit_extract_index() {
     local sel="$1" key
     # Extract key before colon
     key="${sel%%:*}"
     # If it's a single letter, convert to index
     if [[ "$key" =~ ^[a-z]$ ]]; then
-        _zsh_jumper_hint_to_index "$key"
+        _zledit_hint_to_index "$key"
     else
         echo "$key"
     fi
 }
 
-_zsh_jumper_do_jump() {
+_zledit_do_jump() {
     local sel="$1"
     [[ -z "$sel" ]] && return 1
 
-    local idx="$(_zsh_jumper_extract_index "$sel")"
+    local idx="$(_zledit_extract_index "$sel")"
     [[ "$idx" =~ ^[0-9]+$ ]] || return 1
-    (( idx < 1 || idx > ${#_zj_words[@]} )) && return 1
+    (( idx < 1 || idx > ${#_ze_words[@]} )) && return 1
 
-    local pos="${_zj_positions[$idx]}"
-    local target="${_zj_words[$idx]}"
+    local pos="${_ze_positions[$idx]}"
+    local target="${_ze_words[$idx]}"
 
-    case "${ZshJumper[cursor]}" in
+    case "${Zledit[cursor]}" in
         end)    CURSOR=$((pos + ${#target})) ;;
         middle) CURSOR=$((pos + ${#target} / 2)) ;;
         *)      CURSOR=$pos ;;
@@ -584,34 +584,34 @@ _zsh_jumper_do_jump() {
 #     2 = display mode (show stdout in terminal, no buffer change)
 #     3 = push-line mode (format: "new_buffer\n---ZJ_PUSHLINE---\npushed_line")
 #     4 = push-line + auto-execute (same format, but executes pushed_line immediately)
-_zsh_jumper_do_custom_action() {
+_zledit_do_custom_action() {
     emulate -L zsh
     local action_idx="$1" sel="$2"
     [[ -z "$sel" ]] && return 1
 
     # Validate action index
-    (( action_idx < 1 || action_idx > ${#_zj_action_scripts[@]} )) && return 1
+    (( action_idx < 1 || action_idx > ${#_ze_action_scripts[@]} )) && return 1
 
-    local script="${_zj_action_scripts[$action_idx]}"
+    local script="${_ze_action_scripts[$action_idx]}"
     [[ ! -x "$script" ]] && {
-        zle -M "zsh-jumper: action script not executable: $script"
+        zle -M "zledit: action script not executable: $script"
         return 1
     }
 
     # Get selected token
-    local token_idx="$(_zsh_jumper_extract_index "$sel")"
+    local token_idx="$(_zledit_extract_index "$sel")"
     [[ "$token_idx" =~ ^[0-9]+$ ]] || return 1
-    (( token_idx < 1 || token_idx > ${#_zj_words[@]} )) && return 1
-    local token="${_zj_words[$token_idx]}"
+    (( token_idx < 1 || token_idx > ${#_ze_words[@]} )) && return 1
+    local token="${_ze_words[$token_idx]}"
 
     # Export environment for script
     local result stderr_file=$(mktemp)
     result=$(
         export ZJ_BUFFER="$BUFFER"
-        export ZJ_WORDS="${(pj:\n:)_zj_words}"
-        export ZJ_POSITIONS="${(pj:\n:)_zj_positions}"
+        export ZJ_WORDS="${(pj:\n:)_ze_words}"
+        export ZJ_POSITIONS="${(pj:\n:)_ze_positions}"
         export ZJ_CURSOR="$CURSOR"
-        export ZJ_PICKER="${ZshJumper[picker]}"
+        export ZJ_PICKER="${Zledit[picker]}"
         "$script" "$token" "$token_idx" 2>"$stderr_file"
     )
     local exit_code=$?
@@ -626,12 +626,12 @@ _zsh_jumper_do_custom_action() {
                     CURSOR="${match[1]}"
                 else
                     BUFFER="${result%$'\n'}"  # Strip trailing newline
-                    CURSOR="${_zj_positions[$token_idx]}"  # Default to token position
+                    CURSOR="${_ze_positions[$token_idx]}"  # Default to token position
                 fi
             fi
             ;;
         1)  # Error
-            [[ -n "$stderr_out" ]] && zle -M "zsh-jumper: action failed: $stderr_out"
+            [[ -n "$stderr_out" ]] && zle -M "zledit: action failed: $stderr_out"
             return 1
             ;;
         2)  # Display mode - show output in terminal
@@ -648,7 +648,7 @@ _zsh_jumper_do_custom_action() {
                 new_buffer="${new_buffer%$'\n'}"
                 pushed_line="${pushed_line#$'\n'}"
                 BUFFER="$new_buffer"
-                CURSOR="${_zj_positions[$token_idx]}"
+                CURSOR="${_ze_positions[$token_idx]}"
                 zle push-line
                 # Check for CURSOR:N in pushed_line
                 local last_line="${pushed_line##*$'\n'}"
@@ -676,45 +676,45 @@ _zsh_jumper_do_custom_action() {
     esac
 }
 
-zle -N zsh-jumper-widget
+zle -N zledit-widget
 
 # ------------------------------------------------------------------------------
 # Keybindings
 # ------------------------------------------------------------------------------
 
-zsh-jumper-setup-bindings() {
+zledit-setup-bindings() {
     emulate -L zsh
 
-    if zstyle -t ':zsh-jumper:' disable-bindings; then
+    if zstyle -t ':zledit:' disable-bindings; then
         return 0
     fi
 
     local key
-    zstyle -s ':zsh-jumper:' binding key || key='^X/'
-    bindkey "$key" zsh-jumper-widget
+    zstyle -s ':zledit:' binding key || key='^X/'
+    bindkey "$key" zledit-widget
 }
 
-zsh-jumper-setup-bindings
+zledit-setup-bindings
 
 # ------------------------------------------------------------------------------
 # List registered actions/previewers
 # ------------------------------------------------------------------------------
 
-zsh-jumper-list() {
+zledit-list() {
     emulate -L zsh
     local i val
     print "Config:"
-    print "  plugin:  ${ZshJumper[dir]}"
-    zstyle -s ':zsh-jumper:' config val && print "  config:  $val"
-    print "  picker:  ${ZshJumper[picker]}"
-    print "  binding: $(bindkey | grep zsh-jumper-widget | awk '{print $1}')"
+    print "  plugin:  ${Zledit[dir]}"
+    zstyle -s ':zledit:' config val && print "  config:  $val"
+    print "  picker:  ${Zledit[picker]}"
+    print "  binding: $(bindkey | grep zledit-widget | awk '{print $1}')"
     print "\nActions:"
-    for i in {1..${#_zj_action_bindings[@]}}; do
-        printf "  %-10s %-10s %s\n" "${_zj_action_bindings[$i]}" "${_zj_action_descriptions[$i]}" "${_zj_action_scripts[$i]}"
+    for i in {1..${#_ze_action_bindings[@]}}; do
+        printf "  %-10s %-10s %s\n" "${_ze_action_bindings[$i]}" "${_ze_action_descriptions[$i]}" "${_ze_action_scripts[$i]}"
     done
     print "\nPreviewers:"
-    for i in {1..${#_zj_previewer_patterns[@]}}; do
-        printf "  %-12s %s\n" "${_zj_previewer_descriptions[$i]}" "${_zj_previewer_scripts[$i]}"
+    for i in {1..${#_ze_previewer_patterns[@]}}; do
+        printf "  %-12s %s\n" "${_ze_previewer_descriptions[$i]}" "${_ze_previewer_scripts[$i]}"
     done
 }
 
@@ -722,38 +722,38 @@ zsh-jumper-list() {
 # Unload (for plugin managers like zinit)
 # ------------------------------------------------------------------------------
 
-zsh-jumper-unload() {
+zledit-unload() {
     emulate -L zsh
 
-    zle -D zsh-jumper-widget 2>/dev/null
+    zle -D zledit-widget 2>/dev/null
 
-    unfunction zsh-jumper-widget _zsh_jumper_load_config \
-               _zsh_jumper_load_default_actions \
-               _zsh_jumper_invoke_picker _zsh_jumper_tokenize \
-               _zsh_jumper_supports_binds _zsh_jumper_do_jump \
-               _zsh_jumper_do_custom_action \
-               _zsh_jumper_adapter_fzf _zsh_jumper_adapter_fzf-tmux \
-               _zsh_jumper_adapter_sk _zsh_jumper_adapter_peco \
-               _zsh_jumper_adapter_percol _zsh_jumper_adapter_fzflike \
-               _zsh_jumper_adapter_simple _zsh_jumper_extract_index \
-               _zsh_jumper_build_overlay _zsh_jumper_hint_to_index \
-               _zsh_jumper_highlight_hints _zsh_jumper_build_preview_cmd \
-               _zsh_jumper_parse_toml _zsh_jumper_save_toml_item \
-               zsh-jumper-setup-bindings zsh-jumper-list zsh-jumper-unload 2>/dev/null
+    unfunction zledit-widget _zledit_load_config \
+               _zledit_load_default_actions \
+               _zledit_invoke_picker _zledit_tokenize \
+               _zledit_supports_binds _zledit_do_jump \
+               _zledit_do_custom_action \
+               _zledit_adapter_fzf _zledit_adapter_fzf-tmux \
+               _zledit_adapter_sk _zledit_adapter_peco \
+               _zledit_adapter_percol _zledit_adapter_fzflike \
+               _zledit_adapter_simple _zledit_extract_index \
+               _zledit_build_overlay _zledit_hint_to_index \
+               _zledit_highlight_hints _zledit_build_preview_cmd \
+               _zledit_parse_toml _zledit_save_toml_item \
+               zledit-setup-bindings zledit-list zledit-unload 2>/dev/null
 
-    unset '_zj_words' '_zj_positions' '_zj_result_key' '_zj_result_selection' \
-          '_zj_invoke_prompt' '_zj_invoke_header' '_zj_invoke_binds' \
-          '_zj_invoke_preview_args' '_zj_hint_keys' \
-          '_zj_previewer_patterns' '_zj_previewer_descriptions' '_zj_previewer_scripts' \
-          '_zj_action_bindings' '_zj_action_descriptions' '_zj_action_scripts'
-    unset ZshJumper
+    unset '_ze_words' '_ze_positions' '_ze_result_key' '_ze_result_selection' \
+          '_ze_invoke_prompt' '_ze_invoke_header' '_ze_invoke_binds' \
+          '_ze_invoke_preview_args' '_ze_hint_keys' \
+          '_ze_previewer_patterns' '_ze_previewer_descriptions' '_ze_previewer_scripts' \
+          '_ze_action_bindings' '_ze_action_descriptions' '_ze_action_scripts'
+    unset Zledit
 
     return 0
 }
 
 # Register unload hook if zinit supports it
 if (( $+functions[@zsh-plugin-run-on-unload] )); then
-    @zsh-plugin-run-on-unload 'zsh-jumper-unload'
+    @zsh-plugin-run-on-unload 'zledit-unload'
 fi
 
 return 0

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zsh-jumper action: var (extract to variable)
+# zledit action: var (extract to variable)
 # Args: $1 = token, $2 = index (1-based)
 # Env:  ZJ_BUFFER, ZJ_POSITIONS
 # Output: new buffer + push-line content (separated by ---ZJ_PUSHLINE---)

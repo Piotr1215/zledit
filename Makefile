@@ -7,4 +7,4 @@ test-verbose:
 	@zsh tests/test_plugin.zsh --verbose
 
 lint:
-	@zsh -n zsh-jumper.plugin.zsh
+	@zsh -n zledit.plugin.zsh

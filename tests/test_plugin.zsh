@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Test suite for zsh-jumper
+# Test suite for zledit
 # Run: zsh tests/test_plugin.zsh [--verbose]
 
 emulate -L zsh
@@ -53,7 +53,7 @@ skip_test() {
 
 test_plugin_loads() {
     # Run in subshell, capture exit code
-    zsh -c "source $PLUGIN_DIR/zsh-jumper.plugin.zsh" >/dev/null 2>&1
+    zsh -c "source $PLUGIN_DIR/zledit.plugin.zsh" >/dev/null 2>&1
     if [[ $? -eq 0 ]]; then
         test_pass "Plugin loads without errors"
     else
@@ -64,18 +64,18 @@ test_plugin_loads() {
 test_functions_defined() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        (( \$+functions[zsh-jumper-widget] )) || exit 1
-        (( \$+functions[_zsh_jumper_load_config] )) || exit 1
-        (( \$+functions[_zsh_jumper_load_default_actions] )) || exit 1
-        (( \$+functions[_zsh_jumper_invoke_picker] )) || exit 1
-        (( \$+functions[_zsh_jumper_adapter_fzf] )) || exit 1
-        (( \$+functions[zsh-jumper-setup-bindings] )) || exit 1
-        (( \$+functions[zsh-jumper-unload] )) || exit 1
-        (( \$+functions[_zsh_jumper_tokenize] )) || exit 1
-        (( \$+functions[_zsh_jumper_supports_binds] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_custom_action] )) || exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[zledit-widget] )) || exit 1
+        (( \$+functions[_zledit_load_config] )) || exit 1
+        (( \$+functions[_zledit_load_default_actions] )) || exit 1
+        (( \$+functions[_zledit_invoke_picker] )) || exit 1
+        (( \$+functions[_zledit_adapter_fzf] )) || exit 1
+        (( \$+functions[zledit-setup-bindings] )) || exit 1
+        (( \$+functions[zledit-unload] )) || exit 1
+        (( \$+functions[_zledit_tokenize] )) || exit 1
+        (( \$+functions[_zledit_supports_binds] )) || exit 1
+        (( \$+functions[_zledit_do_jump] )) || exit 1
+        (( \$+functions[_zledit_do_custom_action] )) || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "All functions defined"
@@ -87,8 +87,8 @@ test_functions_defined() {
 test_global_state() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        [[ -n \"\${ZshJumper[dir]}\" ]] || exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        [[ -n \"\${Zledit[dir]}\" ]] || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "Global state initialized"
@@ -100,14 +100,14 @@ test_global_state() {
 test_default_actions_loaded() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        source $PLUGIN_DIR/zledit.plugin.zsh
         # Check that default actions are registered (wrap, var, replace, move)
-        (( \${#_zj_action_bindings[@]} >= 4 )) || exit 1
-        (( \${#_zj_action_scripts[@]} >= 4 )) || exit 1
-        [[ \"\${_zj_action_descriptions[*]}\" == *wrap* ]] || exit 1
-        [[ \"\${_zj_action_descriptions[*]}\" == *var* ]] || exit 1
-        [[ \"\${_zj_action_descriptions[*]}\" == *replace* ]] || exit 1
-        [[ \"\${_zj_action_descriptions[*]}\" == *move* ]] || exit 1
+        (( \${#_ze_action_bindings[@]} >= 4 )) || exit 1
+        (( \${#_ze_action_scripts[@]} >= 4 )) || exit 1
+        [[ \"\${_ze_action_descriptions[*]}\" == *wrap* ]] || exit 1
+        [[ \"\${_ze_action_descriptions[*]}\" == *var* ]] || exit 1
+        [[ \"\${_ze_action_descriptions[*]}\" == *replace* ]] || exit 1
+        [[ \"\${_ze_action_descriptions[*]}\" == *move* ]] || exit 1
     " 2>&1)
     if [[ $? -eq 0 ]]; then
         test_pass "Default actions loaded"
@@ -138,8 +138,8 @@ test_picker_detection_fzf() {
 
     local picker
     picker=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${ZshJumper[picker]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[picker]}\"
     " 2>&1)
 
     if [[ "$picker" == fzf* ]]; then
@@ -157,8 +157,8 @@ test_picker_detection_sk() {
 
     local picker
     picker=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${ZshJumper[picker]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[picker]}\"
     " 2>&1)
 
     if [[ -n "$picker" ]]; then
@@ -176,8 +176,8 @@ test_picker_detection_peco() {
 
     local picker
     picker=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${ZshJumper[picker]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[picker]}\"
     " 2>&1)
 
     if [[ -n "$picker" ]]; then
@@ -195,9 +195,9 @@ test_zstyle_picker_override() {
 
     local picker
     picker=$(zsh -c "
-        zstyle ':zsh-jumper:' picker fzf
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${ZshJumper[picker]}\"
+        zstyle ':zledit:' picker fzf
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[picker]}\"
     " 2>&1)
 
     if [[ "$picker" == "fzf" ]]; then
@@ -210,12 +210,12 @@ test_zstyle_picker_override() {
 test_adapter_functions_exist() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        (( \$+functions[_zsh_jumper_adapter_fzf] )) || exit 1
-        (( \$+functions[_zsh_jumper_adapter_fzf-tmux] )) || exit 1
-        (( \$+functions[_zsh_jumper_adapter_sk] )) || exit 1
-        (( \$+functions[_zsh_jumper_adapter_peco] )) || exit 1
-        (( \$+functions[_zsh_jumper_adapter_percol] )) || exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[_zledit_adapter_fzf] )) || exit 1
+        (( \$+functions[_zledit_adapter_fzf-tmux] )) || exit 1
+        (( \$+functions[_zledit_adapter_sk] )) || exit 1
+        (( \$+functions[_zledit_adapter_peco] )) || exit 1
+        (( \$+functions[_zledit_adapter_percol] )) || exit 1
     " 2>&1)
 
     if [[ $? -eq 0 ]]; then
@@ -228,9 +228,9 @@ test_adapter_functions_exist() {
 test_invoke_picker_dispatches() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        source $PLUGIN_DIR/zledit.plugin.zsh
         # Test that invoke_picker dispatches to adapter (will fail on unknown picker)
-        echo 'test' | _zsh_jumper_invoke_picker unknown_picker 'prompt> ' '' '' 2>&1
+        echo 'test' | _zledit_invoke_picker unknown_picker 'prompt> ' '' '' 2>&1
     " 2>&1)
 
     if [[ "$result" == *"unknown picker"* ]]; then
@@ -244,9 +244,9 @@ test_cursor_position() {
     # Test that cursor zstyle is read (can't test actual cursor movement without ZLE)
     local result
     result=$(zsh -c "
-        zstyle ':zsh-jumper:' cursor end
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        zstyle -s ':zsh-jumper:' cursor val && echo \$val
+        zstyle ':zledit:' cursor end
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        zstyle -s ':zledit:' cursor val && echo \$val
     " 2>&1)
 
     if [[ "$result" == "end" ]]; then
@@ -260,13 +260,13 @@ test_fzf_key_defaults_not_empty() {
     local result
     result=$(zsh -c "
         # Only set ONE key, others should get defaults
-        zstyle ':zsh-jumper:' fzf-help-key 'ctrl-g'
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        zstyle ':zledit:' fzf-help-key 'ctrl-g'
+        source $PLUGIN_DIR/zledit.plugin.zsh
 
         local wrap_key help_key var_key
-        zstyle -s ':zsh-jumper:' fzf-wrap-key wrap_key
-        zstyle -s ':zsh-jumper:' fzf-help-key help_key
-        zstyle -s ':zsh-jumper:' fzf-var-key var_key
+        zstyle -s ':zledit:' fzf-wrap-key wrap_key
+        zstyle -s ':zledit:' fzf-help-key help_key
+        zstyle -s ':zledit:' fzf-var-key var_key
         [[ -z \"\$wrap_key\" ]] && wrap_key=ctrl-s
         [[ -z \"\$help_key\" ]] && help_key=ctrl-h
         [[ -z \"\$var_key\" ]] && var_key=ctrl-e
@@ -285,9 +285,9 @@ test_fzf_key_defaults_not_empty() {
 test_disable_bindings() {
     local bound
     bound=$(zsh -c "
-        zstyle ':zsh-jumper:' disable-bindings yes
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        bindkey -L | grep -c 'zsh-jumper-widget' || true
+        zstyle ':zledit:' disable-bindings yes
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        bindkey -L | grep -c 'zledit-widget' || true
     " 2>&1)
     # Remove any non-numeric chars (stderr noise)
     bound="${bound//[^0-9]/}"
@@ -303,9 +303,9 @@ test_disable_bindings() {
 test_unload() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        zsh-jumper-unload
-        (( \$+functions[zsh-jumper-widget] )) && exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        zledit-unload
+        (( \$+functions[zledit-widget] )) && exit 1
         exit 0
     " 2>&1)
     if [[ $? -eq 0 ]]; then
@@ -318,8 +318,8 @@ test_unload() {
 test_picker_pipe() {
     local picker
     picker=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${ZshJumper[picker]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[picker]}\"
     " 2>&1)
 
     if [[ -z "$picker" ]]; then
@@ -897,11 +897,11 @@ test_accented_latin() {
 test_supports_binds_detection() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_supports_binds 'fzf' && echo 'fzf:yes'
-        _zsh_jumper_supports_binds 'fzf-tmux' && echo 'fzf-tmux:yes'
-        _zsh_jumper_supports_binds 'sk' && echo 'sk:yes'
-        _zsh_jumper_supports_binds 'peco' || echo 'peco:no'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_supports_binds 'fzf' && echo 'fzf:yes'
+        _zledit_supports_binds 'fzf-tmux' && echo 'fzf-tmux:yes'
+        _zledit_supports_binds 'sk' && echo 'sk:yes'
+        _zledit_supports_binds 'peco' || echo 'peco:no'
     " 2>&1)
 
     if [[ "$result" == *"fzf:yes"* ]] && [[ "$result" == *"fzf-tmux:yes"* ]] && \
@@ -1006,10 +1006,10 @@ test_tokenizer_positions() {
     local result
     result=$(zsh -c '
         emulate -L zsh
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="kubectl get pods -n kube-system"
-        _zsh_jumper_tokenize
-        echo "${_zj_positions[4]}"
+        _zledit_tokenize
+        echo "${_ze_positions[4]}"
     ' 2>&1)
 
     if [[ "$result" == "17" ]]; then
@@ -1022,10 +1022,10 @@ test_tokenizer_positions() {
 test_tokenizer_multiple_spaces() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="a    b     c"
-        _zsh_jumper_tokenize
-        echo "${#_zj_words[@]}:${_zj_positions[1]}:${_zj_positions[2]}:${_zj_positions[3]}"
+        _zledit_tokenize
+        echo "${#_ze_words[@]}:${_ze_positions[1]}:${_ze_positions[2]}:${_ze_positions[3]}"
     ' 2>&1)
     if [[ "$result" == "3:0:5:11" ]]; then
         test_pass "Multiple spaces handled correctly"
@@ -1037,10 +1037,10 @@ test_tokenizer_multiple_spaces() {
 test_tokenizer_leading_trailing_spaces() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="   word   "
-        _zsh_jumper_tokenize
-        echo "${#_zj_words[@]}:${_zj_words[1]}:${_zj_positions[1]}"
+        _zledit_tokenize
+        echo "${#_ze_words[@]}:${_ze_words[1]}:${_ze_positions[1]}"
     ' 2>&1)
     if [[ "$result" == "1:word:3" ]]; then
         test_pass "Leading/trailing spaces handled"
@@ -1052,10 +1052,10 @@ test_tokenizer_leading_trailing_spaces() {
 test_tokenizer_tabs_mixed() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER=$'"'"'a\tb\t\tc'"'"'
-        _zsh_jumper_tokenize
-        echo "${#_zj_words[@]}"
+        _zledit_tokenize
+        echo "${#_ze_words[@]}"
     ' 2>&1)
     if [[ "$result" == "3" ]]; then
         test_pass "Tabs handled as whitespace"
@@ -1067,10 +1067,10 @@ test_tokenizer_tabs_mixed() {
 test_tokenizer_very_long_string() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER=$(printf "word%.0s " {1..500})
-        _zsh_jumper_tokenize
-        echo "${#_zj_words[@]}:${_zj_positions[500]}"
+        _zledit_tokenize
+        echo "${#_ze_words[@]}:${_ze_positions[500]}"
     ' 2>&1)
     if [[ "$result" == "500:2495" ]]; then
         test_pass "500 words tokenized correctly"
@@ -1082,10 +1082,10 @@ test_tokenizer_very_long_string() {
 test_tokenizer_special_shell_chars() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo \$VAR | grep -E \"[a-z]+\" > /dev/null && cmd"
-        _zsh_jumper_tokenize
-        echo "${#_zj_words[@]}:${_zj_words[2]}:${_zj_words[6]}"
+        _zledit_tokenize
+        echo "${#_ze_words[@]}:${_ze_words[2]}:${_ze_words[6]}"
     ' 2>&1)
     if [[ "$result" == '10:$VAR:"[a-z]+"' ]]; then
         test_pass "Shell special chars preserved"
@@ -1097,10 +1097,10 @@ test_tokenizer_special_shell_chars() {
 test_tokenizer_dashes_flags() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="cmd --flag -f --long-option --another=value"
-        _zsh_jumper_tokenize
-        echo "${_zj_words[2]}:${_zj_positions[2]}|${_zj_words[4]}:${_zj_positions[4]}"
+        _zledit_tokenize
+        echo "${_ze_words[2]}:${_ze_positions[2]}|${_ze_words[4]}:${_ze_positions[4]}"
     ' 2>&1)
     if [[ "$result" == "--flag:4|--long-option:14" ]]; then
         test_pass "Dashes and flags positioned correctly"
@@ -1112,10 +1112,10 @@ test_tokenizer_dashes_flags() {
 test_tokenizer_equals_in_word() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="export VAR=value KEY=123"
-        _zsh_jumper_tokenize
-        echo "${_zj_words[2]}:${_zj_positions[2]}"
+        _zledit_tokenize
+        echo "${_ze_words[2]}:${_ze_positions[2]}"
     ' 2>&1)
     if [[ "$result" == "VAR=value:7" ]]; then
         test_pass "Equals preserved in word"
@@ -1127,10 +1127,10 @@ test_tokenizer_equals_in_word() {
 test_action_helpers_defined() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        (( \$+functions[_zsh_jumper_do_jump] )) || exit 1
-        (( \$+functions[_zsh_jumper_do_custom_action] )) || exit 1
-        (( \$+functions[_zsh_jumper_load_default_actions] )) || exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[_zledit_do_jump] )) || exit 1
+        (( \$+functions[_zledit_do_custom_action] )) || exit 1
+        (( \$+functions[_zledit_load_default_actions] )) || exit 1
         echo 'ok'
     " 2>&1)
 
@@ -1144,8 +1144,8 @@ test_action_helpers_defined() {
 test_single_keybinding() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        bindkey -L | grep -c 'zsh-jumper-widget'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        bindkey -L | grep -c 'zledit-widget'
     " 2>&1)
     result="${result//[^0-9]/}"
 
@@ -1160,14 +1160,14 @@ test_unload_cleans_enrichment() {
     # Comprehensive leak detection - catches ANY leaked function/variable by pattern
     local leaked_funcs leaked_vars
     leaked_funcs=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        zsh-jumper-unload
-        print -l \${(k)functions} | grep -E '^_?zsh.jumper|^_zj_' || true
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        zledit-unload
+        print -l \${(k)functions} | grep -E '^_?zsh.jumper|^_ze_' || true
     " 2>&1)
     leaked_vars=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        zsh-jumper-unload
-        print -l \${(k)parameters} | grep -E '^_zj_|^ZshJumper' || true
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        zledit-unload
+        print -l \${(k)parameters} | grep -E '^_ze_|^Zledit' || true
     " 2>&1)
 
     if [[ -z "$leaked_funcs" && -z "$leaked_vars" ]]; then
@@ -1426,10 +1426,10 @@ test_move_exits_on_single_token() {
 test_wrap_double_quote() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo foo bar"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open="\"" close="\""
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1442,10 +1442,10 @@ test_wrap_double_quote() {
 test_wrap_single_quote() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo foo bar"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open="'"'"'" close="'"'"'"
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1458,10 +1458,10 @@ test_wrap_single_quote() {
 test_wrap_quoted_var() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo foo bar"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open='"'"'"$'"'"' close='"'"'"'"'"'
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1474,10 +1474,10 @@ test_wrap_quoted_var() {
 test_wrap_var_expansion() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo foo bar"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open='"'"'${'"'"' close="}"
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1490,10 +1490,10 @@ test_wrap_var_expansion() {
 test_wrap_cmd_subst() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo foo bar"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open='"'"'$('"'"' close=")"
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1506,10 +1506,10 @@ test_wrap_cmd_subst() {
 test_wrap_special_chars() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo --my-flag=value"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[2]}" target="${_zj_words[2]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[2]}" target="${_ze_words[2]}"
         local open="\"" close="\""
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1522,10 +1522,10 @@ test_wrap_special_chars() {
 test_wrap_first_word() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="kubectl get pods"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[1]}" target="${_zj_words[1]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[1]}" target="${_ze_words[1]}"
         local open='"'"'$('"'"' close=")"
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1538,10 +1538,10 @@ test_wrap_first_word() {
 test_wrap_last_word() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="echo hello world"
-        _zsh_jumper_tokenize
-        local pos="${_zj_positions[3]}" target="${_zj_words[3]}"
+        _zledit_tokenize
+        local pos="${_ze_positions[3]}" target="${_ze_words[3]}"
         local open='"'"'${'"'"' close="}"
         local end_pos=$((pos + ${#target}))
         BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1564,10 +1564,10 @@ test_tokenizer_fixtures() {
         tmpfile=$(mktemp)
         print -r -- "$input" > "$tmpfile"
         result=$(zsh -c '
-            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            source '"$PLUGIN_DIR"'/zledit.plugin.zsh
             BUFFER=$(<'"$tmpfile"')
-            _zsh_jumper_tokenize
-            print -r -- "${#_zj_words[@]} ${_zj_positions[*]}"
+            _zledit_tokenize
+            print -r -- "${#_ze_words[@]} ${_ze_positions[*]}"
         ' 2>/dev/null)
         rm -f "$tmpfile"
         actual_count="${result%% *}"
@@ -1602,10 +1602,10 @@ test_multiline_fixtures() {
         tmpfile=$(mktemp)
         print -r -- "$expanded" > "$tmpfile"
         result=$(zsh -c '
-            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            source '"$PLUGIN_DIR"'/zledit.plugin.zsh
             BUFFER=$(<'"$tmpfile"')
-            _zsh_jumper_tokenize
-            print -r -- "${#_zj_words[@]} ${_zj_positions[*]}"
+            _zledit_tokenize
+            print -r -- "${#_ze_words[@]} ${_ze_positions[*]}"
         ' 2>/dev/null)
         rm -f "$tmpfile"
         actual_count="${result%% *}"
@@ -1639,12 +1639,12 @@ test_var_fixtures() {
         print -r -- "$input" > "$tmpfile"
         print -r -- "$expected_buffer" > "$tmpexpected"
         result=$(zsh -c '
-            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            source '"$PLUGIN_DIR"'/zledit.plugin.zsh
             BUFFER=$(<'"$tmpfile"')
-            _zsh_jumper_tokenize
+            _zledit_tokenize
             local idx='"$token_idx"'
-            local pos="${_zj_positions[$idx]}"
-            local target="${_zj_words[$idx]}"
+            local pos="${_ze_positions[$idx]}"
+            local target="${_ze_words[$idx]}"
             local var_name="${${(U)target}//[^A-Z0-9]/_}"
             local end_pos=$((pos + ${#target}))
             BUFFER="${BUFFER:0:$pos}\"\$${var_name}\"${BUFFER:$end_pos}"
@@ -1684,12 +1684,12 @@ test_replace_fixtures() {
         print -r -- "$input" > "$tmpfile"
         print -r -- "$expected_buffer" > "$tmpexpected"
         result=$(zsh -c '
-            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            source '"$PLUGIN_DIR"'/zledit.plugin.zsh
             BUFFER=$(<'"$tmpfile"')
             CURSOR=0
-            _zsh_jumper_tokenize
+            _zledit_tokenize
             local idx='"$token_idx"'
-            local pos="${_zj_positions[$idx]}" target="${_zj_words[$idx]}"
+            local pos="${_ze_positions[$idx]}" target="${_ze_words[$idx]}"
             local end_pos=$((pos + ${#target}))
             BUFFER="${BUFFER:0:$pos}${BUFFER:$end_pos}"
             CURSOR=$pos
@@ -1745,11 +1745,11 @@ test_wrap_fixtures() {
         print -r -- "$close" > "$tmpclose"
         print -r -- "$expected_buffer" > "$tmpexpected"
         result=$(zsh -c '
-            source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+            source '"$PLUGIN_DIR"'/zledit.plugin.zsh
             BUFFER=$(<'"$tmpfile"')
-            _zsh_jumper_tokenize
+            _zledit_tokenize
             local idx='"$token_idx"'
-            local pos="${_zj_positions[$idx]}" target="${_zj_words[$idx]}"
+            local pos="${_ze_positions[$idx]}" target="${_ze_words[$idx]}"
             local open=$(<'"$tmpopen"') close=$(<'"$tmpclose"')
             local end_pos=$((pos + ${#target}))
             BUFFER="${BUFFER:0:$end_pos}${close}${BUFFER:$end_pos}"
@@ -1776,8 +1776,8 @@ test_wrap_fixtures() {
 test_hint_keys_defined() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${#_zj_hint_keys[@]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${#_ze_hint_keys[@]}\"
     " 2>&1)
 
     if [[ "$result" == "26" ]]; then
@@ -1790,8 +1790,8 @@ test_hint_keys_defined() {
 test_hint_keys_home_row_first() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${_zj_hint_keys[1]} \${_zj_hint_keys[2]} \${_zj_hint_keys[3]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${_ze_hint_keys[1]} \${_ze_hint_keys[2]} \${_ze_hint_keys[3]}\"
     " 2>&1)
 
     if [[ "$result" == "a s d" ]]; then
@@ -1804,10 +1804,10 @@ test_hint_keys_home_row_first() {
 test_build_overlay_simple() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="kubectl get pods"
-        _zsh_jumper_tokenize
-        _zsh_jumper_build_overlay
+        _zledit_tokenize
+        _zledit_build_overlay
         echo "$REPLY"
     ' 2>&1)
 
@@ -1821,10 +1821,10 @@ test_build_overlay_simple() {
 test_build_overlay_preserves_spaces() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="a    b"
-        _zsh_jumper_tokenize
-        _zsh_jumper_build_overlay
+        _zledit_tokenize
+        _zledit_build_overlay
         echo "$REPLY"
     ' 2>&1)
 
@@ -1838,10 +1838,10 @@ test_build_overlay_preserves_spaces() {
 test_build_overlay_many_words() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="a b c d e f g h i j k l m n o p q r s t u v w x y z aa bb"
-        _zsh_jumper_tokenize
-        _zsh_jumper_build_overlay
+        _zledit_tokenize
+        _zledit_build_overlay
         echo "${REPLY:0:4}|${REPLY: -6}"
     ' 2>&1)
 
@@ -1855,9 +1855,9 @@ test_build_overlay_many_words() {
 test_highlight_multidigit_hints() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
         BUFFER="[a]word [27]another [123]third"
-        _zsh_jumper_highlight_hints
+        _zledit_highlight_hints
         echo "${#region_highlight[@]}"
     ' 2>&1)
 
@@ -1871,8 +1871,8 @@ test_highlight_multidigit_hints() {
 test_hint_to_index_a() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_hint_to_index 'a'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_hint_to_index 'a'
     " 2>&1)
 
     if [[ "$result" == "1" ]]; then
@@ -1885,8 +1885,8 @@ test_hint_to_index_a() {
 test_hint_to_index_s() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_hint_to_index 's'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_hint_to_index 's'
     " 2>&1)
 
     if [[ "$result" == "2" ]]; then
@@ -1899,8 +1899,8 @@ test_hint_to_index_s() {
 test_hint_to_index_q() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_hint_to_index 'q'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_hint_to_index 'q'
     " 2>&1)
 
     if [[ "$result" == "10" ]]; then
@@ -1913,8 +1913,8 @@ test_hint_to_index_q() {
 test_hint_to_index_numeric_fallback() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_hint_to_index '5'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_hint_to_index '5'
     " 2>&1)
 
     if [[ "$result" == "5" ]]; then
@@ -1927,8 +1927,8 @@ test_hint_to_index_numeric_fallback() {
 test_extract_index_letter_hint() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index 'a: kubectl'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_extract_index 'a: kubectl'
     " 2>&1)
 
     if [[ "$result" == "1" ]]; then
@@ -1941,8 +1941,8 @@ test_extract_index_letter_hint() {
 test_extract_index_letter_s() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index 's: get'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_extract_index 's: get'
     " 2>&1)
 
     if [[ "$result" == "2" ]]; then
@@ -1955,8 +1955,8 @@ test_extract_index_letter_s() {
 test_extract_index_number() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_extract_index '27: word'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_extract_index '27: word'
     " 2>&1)
 
     if [[ "$result" == "27" ]]; then
@@ -1969,11 +1969,11 @@ test_extract_index_number() {
 test_numbered_list_format() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        _zj_words=(kubectl get pods)
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        _ze_words=(kubectl get pods)
         local -a numbered
-        for i in {1..${#_zj_words[@]}}; do
-            numbered+=("$i: ${_zj_words[$i]}")
+        for i in {1..${#_ze_words[@]}}; do
+            numbered+=("$i: ${_ze_words[$i]}")
         done
         printf "%s\n" "${numbered[@]}"
     ' 2>&1)
@@ -1989,11 +1989,11 @@ test_numbered_list_format() {
 test_lettered_list_format() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        _zj_words=(kubectl get pods)
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        _ze_words=(kubectl get pods)
         local -a lettered
-        for i in {1..${#_zj_words[@]}}; do
-            lettered+=("${_zj_hint_keys[$i]}: ${_zj_words[$i]}")
+        for i in {1..${#_ze_words[@]}}; do
+            lettered+=("${_ze_hint_keys[$i]}: ${_ze_words[$i]}")
         done
         printf "%s\n" "${lettered[@]}"
     ' 2>&1)
@@ -2009,10 +2009,10 @@ test_lettered_list_format() {
 test_overlay_functions_exist() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        (( \$+functions[_zsh_jumper_build_overlay] )) || exit 1
-        (( \$+functions[_zsh_jumper_hint_to_index] )) || exit 1
-        (( \$+functions[_zsh_jumper_extract_index] )) || exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[_zledit_build_overlay] )) || exit 1
+        (( \$+functions[_zledit_hint_to_index] )) || exit 1
+        (( \$+functions[_zledit_extract_index] )) || exit 1
         echo 'ok'
     " 2>&1)
 
@@ -2025,7 +2025,7 @@ test_overlay_functions_exist() {
 
 test_overlay_clear_escape_sequence() {
     # Verify the ANSI escape sequence for clearing overlay is present and correct
-    if grep -q "\\\\e\[1A\\\\e\[2K" "$PLUGIN_DIR/zsh-jumper.plugin.zsh"; then
+    if grep -q "\\\\e\[1A\\\\e\[2K" "$PLUGIN_DIR/zledit.plugin.zsh"; then
         test_pass "Overlay clear escape sequence present (move up + clear line)"
     else
         test_fail "Missing overlay clear escape sequence \\e[1A\\e[2K"
@@ -2035,8 +2035,8 @@ test_overlay_clear_escape_sequence() {
 test_instant_key_default() {
     local result
     result=$(zsh -c '
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        echo "${ZshJumper[instant-key]}"
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[instant-key]}"
     ' 2>&1)
 
     if [[ "$result" == ";" ]]; then
@@ -2049,9 +2049,9 @@ test_instant_key_default() {
 test_instant_key_configurable() {
     local result
     result=$(zsh -c '
-        zstyle ":zsh-jumper:" fzf-instant-key "ctrl-i"
-        source '"$PLUGIN_DIR"'/zsh-jumper.plugin.zsh
-        echo "${ZshJumper[instant-key]}"
+        zstyle ":zledit:" fzf-instant-key "ctrl-i"
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[instant-key]}"
     ' 2>&1)
 
     if [[ "$result" == "ctrl-i" ]]; then
@@ -2064,12 +2064,12 @@ test_instant_key_configurable() {
 test_command_with_double_dash() {
     # Test that commands containing -- don't break argument parsing
     result=$(zsh -c '
-        source ./zsh-jumper.plugin.zsh
+        source ./zledit.plugin.zsh
         words=(cmd --flag -- arg1 arg2)
         word_count="${#words[@]}"
         sel="4: arg1"
 
-        # Simulate _zsh_jumper_do_var argument parsing
+        # Simulate _zledit_do_var argument parsing
         args=("$word_count" "${words[@]}" "$sel")
         wc="${args[1]}"; shift args
         parsed_words=("${args[@]:0:$wc}")
@@ -2094,9 +2094,9 @@ test_command_with_double_dash() {
 test_toml_parser_previewers() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$PLUGIN_DIR/tests/fixtures/test_previewers.toml' previewers
-        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$PLUGIN_DIR/tests/fixtures/test_previewers.toml' previewers
+        echo \"\${#_ze_previewer_patterns[@]}:\${_ze_previewer_patterns[1]}\"
     " 2>&1)
 
     if [[ "$result" == '3:^https?://.*' ]]; then
@@ -2109,9 +2109,9 @@ test_toml_parser_previewers() {
 test_toml_parser_actions() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$PLUGIN_DIR/tests/fixtures/test_actions.toml' actions
-        echo \"\${#_zj_action_bindings[@]}:\${_zj_action_bindings[1]}:\${_zj_action_descriptions[1]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$PLUGIN_DIR/tests/fixtures/test_actions.toml' actions
+        echo \"\${#_ze_action_bindings[@]}:\${_ze_action_bindings[1]}:\${_ze_action_descriptions[1]}\"
     " 2>&1)
 
     if [[ "$result" == "2:ctrl-y:uppercase" ]]; then
@@ -2124,8 +2124,8 @@ test_toml_parser_actions() {
 test_toml_parser_missing_file() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '/nonexistent/file.toml' previewers
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '/nonexistent/file.toml' previewers
         echo \$?
     " 2>&1)
 
@@ -2140,9 +2140,9 @@ test_toml_parser_empty_file() {
     local result tmpfile
     tmpfile=$(mktemp)
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$tmpfile' previewers
-        echo \"\${#_zj_previewer_patterns[@]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$tmpfile' previewers
+        echo \"\${#_ze_previewer_patterns[@]}\"
     " 2>&1)
     rm -f "$tmpfile"
 
@@ -2164,9 +2164,9 @@ pattern = '^test$'
 script = '/bin/echo'
 EOF
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$tmpfile' previewers
-        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$tmpfile' previewers
+        echo \"\${#_ze_previewer_patterns[@]}:\${_ze_previewer_patterns[1]}\"
     " 2>&1)
     rm -f "$tmpfile"
 
@@ -2180,8 +2180,8 @@ EOF
 test_build_preview_cmd_script() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_build_preview_cmd
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_build_preview_cmd
         # Script-based preview uses preview.sh
         [[ \"\$REPLY\" == *\"preview.sh\"* ]] && echo 'ok' || echo \"\$REPLY\"
     " 2>&1)
@@ -2196,10 +2196,10 @@ test_build_preview_cmd_script() {
 test_build_preview_cmd_fallback() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        source $PLUGIN_DIR/zledit.plugin.zsh
         # Simulate no script available
-        ZshJumper[dir]='/nonexistent'
-        _zsh_jumper_build_preview_cmd
+        Zledit[dir]='/nonexistent'
+        _zledit_build_preview_cmd
         # Fallback should have inline preview
         [[ \"\$REPLY\" == *\"ls -la\"* ]] && echo 'ok' || echo \"\$REPLY\"
     " 2>&1)
@@ -2214,8 +2214,8 @@ test_build_preview_cmd_fallback() {
 test_custom_action_function_exists() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        (( \$+functions[_zsh_jumper_do_custom_action] )) && echo 'ok' || echo 'missing'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[_zledit_do_custom_action] )) && echo 'ok' || echo 'missing'
     " 2>&1)
 
     if [[ "$result" == "ok" ]]; then
@@ -2234,9 +2234,9 @@ pattern = '^test$'
 script = '/bin/echo'
 EOF
     result=$(zsh -c "
-        zstyle ':zsh-jumper:' previewer-config '$tmpfile'
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        echo \"\${#_zj_previewer_patterns[@]}\"
+        zstyle ':zledit:' previewer-config '$tmpfile'
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${#_ze_previewer_patterns[@]}\"
     " 2>&1)
     rm -f "$tmpfile"
 
@@ -2250,13 +2250,13 @@ EOF
 test_unload_cleans_extensibility() {
     local result
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zj_previewer_patterns=('test')
-        _zj_action_bindings=('ctrl-t')
-        zsh-jumper-unload
-        (( \$+functions[_zsh_jumper_parse_toml] )) && exit 1
-        (( \$+functions[_zsh_jumper_do_custom_action] )) && exit 1
-        (( \$+functions[_zsh_jumper_build_preview_cmd] )) && exit 1
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _ze_previewer_patterns=('test')
+        _ze_action_bindings=('ctrl-t')
+        zledit-unload
+        (( \$+functions[_zledit_parse_toml] )) && exit 1
+        (( \$+functions[_zledit_do_custom_action] )) && exit 1
+        (( \$+functions[_zledit_build_preview_cmd] )) && exit 1
         exit 0
     " 2>&1)
     if [[ $? -eq 0 ]]; then
@@ -2275,9 +2275,9 @@ pattern '^test$'
 command = 'echo test'
 EOF
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$tmpfile' previewers
-        echo \"\${#_zj_previewer_patterns[@]}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$tmpfile' previewers
+        echo \"\${#_ze_previewer_patterns[@]}\"
     " 2>&1)
     rm -f "$tmpfile"
     if [[ "$result" == "0" ]]; then
@@ -2296,9 +2296,9 @@ pattern = '^test$
 command = 'echo test'
 EOF
     result=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-        _zsh_jumper_parse_toml '$tmpfile' previewers
-        echo \"\${#_zj_previewer_patterns[@]}:\${_zj_previewer_patterns[1]:-empty}\"
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _zledit_parse_toml '$tmpfile' previewers
+        echo \"\${#_ze_previewer_patterns[@]}:\${_ze_previewer_patterns[1]:-empty}\"
     " 2>&1)
     rm -f "$tmpfile"
     # Parser takes value as-is when quotes don't match
@@ -2328,10 +2328,10 @@ exit 1
 EOF
     chmod +x "$script"
     result=$(zsh -c "
-        _zj_words=(echo test)
+        _ze_words=(echo test)
         local script='$script' selected_index=0
         local result stderr_file=\$(mktemp)
-        result=\$(printf '%s\n' \"\${_zj_words[@]}\" | SELECTED_INDEX=\"\$selected_index\" \"\$script\" 2>\"\$stderr_file\")
+        result=\$(printf '%s\n' \"\${_ze_words[@]}\" | SELECTED_INDEX=\"\$selected_index\" \"\$script\" 2>\"\$stderr_file\")
         local exit_code=\$?
         rm -f \"\$stderr_file\"
         echo \"exit:\$exit_code\"
@@ -2354,7 +2354,7 @@ test_perf_load_time() {
     for i in {1..3}; do
         local ms=$(zsh -c "
             start=\$(date +%s%N)
-            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+            source $PLUGIN_DIR/zledit.plugin.zsh
             end=\$(date +%s%N)
             echo \$(( (end - start) / 1000000 ))
         " 2>&1)
@@ -2371,10 +2371,10 @@ test_perf_load_time() {
 test_perf_tokenize() {
     local max_ms=150  # 100 tokenizations should complete in <150ms
     local ms=$(zsh -c "
-        source $PLUGIN_DIR/zsh-jumper.plugin.zsh
+        source $PLUGIN_DIR/zledit.plugin.zsh
         BUFFER='kubectl get pods -n default -o wide --show-labels --sort-by=name'
         start=\$(date +%s%N)
-        for i in {1..100}; do _zsh_jumper_tokenize; done
+        for i in {1..100}; do _zledit_tokenize; done
         end=\$(date +%s%N)
         echo \$(( (end - start) / 1000000 ))
     " 2>&1)
@@ -2390,13 +2390,13 @@ test_perf_memory_no_leak() {
     # Compare memory at cycle 5 vs cycle 15 (skip initial allocation)
     local result=$(zsh -c "
         for i in {1..5}; do
-            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-            zsh-jumper-unload
+            source $PLUGIN_DIR/zledit.plugin.zsh
+            zledit-unload
         done
         mem1=\$(ps -o rss= -p \$\$)
         for i in {1..10}; do
-            source $PLUGIN_DIR/zsh-jumper.plugin.zsh
-            zsh-jumper-unload
+            source $PLUGIN_DIR/zledit.plugin.zsh
+            zledit-unload
         done
         mem2=\$(ps -o rss= -p \$\$)
         echo \$((mem2 - mem1))
@@ -2413,7 +2413,7 @@ test_perf_memory_no_leak() {
 # Run tests
 # ------------------------------------------------------------------------------
 
-print "=== zsh-jumper test suite ==="
+print "=== zledit test suite ==="
 print ""
 
 run_test test_plugin_loads

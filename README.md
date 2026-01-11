@@ -1,8 +1,10 @@
-# zsh-jumper
+# zledit
 
-[![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-load.json)](#metrics)
-[![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-tokenize.json)](#metrics)
-[![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzsh-jumper-memory.json)](#metrics)
+**Z**sh **L**ine **Edit**or toolkit - fuzzy navigation and in-place editing for your command line.
+
+[![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-load.json)](#metrics)
+[![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-tokenize.json)](#metrics)
+[![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-memory.json)](#metrics)
 
 Jump to any word on the current command line via fuzzy picker.
 
@@ -54,44 +56,44 @@ One of: [fzf](https://github.com/junegunn/fzf), [sk/skim](https://github.com/lot
 ### zinit
 
 ```zsh
-zinit light Piotr1215/zsh-jumper
+zinit light Piotr1215/zledit
 ```
 
 ### antigen
 
 ```zsh
-antigen bundle Piotr1215/zsh-jumper
+antigen bundle Piotr1215/zledit
 ```
 
 ### oh-my-zsh
 
 ```sh
-git clone https://github.com/Piotr1215/zsh-jumper ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-jumper
+git clone https://github.com/Piotr1215/zledit ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zledit
 ```
 
-Then add `zsh-jumper` to plugins in `.zshrc`:
+Then add `zledit` to plugins in `.zshrc`:
 
 ```zsh
-plugins=(... zsh-jumper)
+plugins=(... zledit)
 ```
 
 ### sheldon
 
 ```toml
-[plugins.zsh-jumper]
-github = "Piotr1215/zsh-jumper"
+[plugins.zledit]
+github = "Piotr1215/zledit"
 ```
 
 ### zplug
 
 ```zsh
-zplug "Piotr1215/zsh-jumper"
+zplug "Piotr1215/zledit"
 ```
 
 ### Manual
 
 ```zsh
-source /path/to/zsh-jumper/zsh-jumper.plugin.zsh
+source /path/to/zledit/zledit.plugin.zsh
 ```
 
 ## Usage
@@ -117,20 +119,20 @@ With FZF, additional actions available via key combos (shown in header):
 
 Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in the command. Special characters become underscores.
 
-**Complex edits**: For heavy multiline editing, `Ctrl+X Ctrl+E` (edit in `$EDITOR`) still shines. zsh-jumper is for quick navigation and token manipulation.
+**Complex edits**: For heavy multiline editing, `Ctrl+X Ctrl+E` (edit in `$EDITOR`) still shines. zledit is for quick navigation and token manipulation.
 
 **Custom FZF keys** (if defaults conflict with your setup):
 ```zsh
-zstyle ':zsh-jumper:' fzf-wrap-key 'ctrl-s'
-zstyle ':zsh-jumper:' fzf-var-key 'ctrl-e'
-zstyle ':zsh-jumper:' fzf-replace-key 'ctrl-r'
-zstyle ':zsh-jumper:' fzf-move-key 'ctrl-m'
-zstyle ':zsh-jumper:' fzf-instant-key ';'    # key to enter instant mode
+zstyle ':zledit:' fzf-wrap-key 'ctrl-s'
+zstyle ':zledit:' fzf-var-key 'ctrl-e'
+zstyle ':zledit:' fzf-replace-key 'ctrl-r'
+zstyle ':zledit:' fzf-move-key 'ctrl-m'
+zstyle ':zledit:' fzf-instant-key ';'    # key to enter instant mode
 ```
 
 **Disable overlay hints**:
 ```zsh
-zstyle ':zsh-jumper:' overlay off
+zstyle ':zledit:' overlay off
 ```
 
 ### Preview Panel (FZF only)
@@ -144,8 +146,8 @@ The preview panel shows contextual information:
 Scroll preview with `Ctrl+D` / `Ctrl+U`.
 
 ```zsh
-zstyle ':zsh-jumper:' preview off              # disable
-zstyle ':zsh-jumper:' preview-window 'bottom:40%'  # position
+zstyle ':zledit:' preview off              # disable
+zstyle ':zledit:' preview-window 'bottom:40%'  # position
 ```
 
 ### Multiline Commands
@@ -166,9 +168,9 @@ Words are split on whitespace (spaces, tabs, newlines). Line continuation backsl
 For vi mode users, bind to both insert and command modes:
 
 ```zsh
-zstyle ':zsh-jumper:' disable-bindings yes
-bindkey -M viins '^X/' zsh-jumper-widget
-bindkey -M vicmd '^X/' zsh-jumper-widget
+zstyle ':zledit:' disable-bindings yes
+bindkey -M viins '^X/' zledit-widget
+bindkey -M vicmd '^X/' zledit-widget
 ```
 
 ## Configuration
@@ -177,31 +179,31 @@ Configure via zstyle in your `.zshrc` **before** loading the plugin:
 
 ```zsh
 # Force specific picker (default: auto-detect)
-zstyle ':zsh-jumper:' picker fzf
+zstyle ':zledit:' picker fzf
 
 # Custom picker options
-zstyle ':zsh-jumper:' picker-opts '--height=50% --reverse --border'
+zstyle ':zledit:' picker-opts '--height=50% --reverse --border'
 
 # Cursor position after jump: start (default), middle, end
-zstyle ':zsh-jumper:' cursor end
+zstyle ':zledit:' cursor end
 
 # Custom keybinding (default: ^X/)
-zstyle ':zsh-jumper:' binding '^J'
+zstyle ':zledit:' binding '^J'
 
 # Disable default keybinding (define your own)
-zstyle ':zsh-jumper:' disable-bindings yes
-bindkey '^X^J' zsh-jumper-widget
+zstyle ':zledit:' disable-bindings yes
+bindkey '^X^J' zledit-widget
 ```
 
 **List registered config:**
 
 ```bash
-zsh-jumper-list  # shows config paths, actions, previewers
+zledit-list  # shows config paths, actions, previewers
 ```
 
 ## Picker Priority
 
-1. Explicit `zstyle ':zsh-jumper:' picker`
+1. Explicit `zstyle ':zledit:' picker`
 2. `fzf-tmux` (when `$TMUX` is set)
 3. `fzf`
 4. `sk` (skim)
@@ -215,11 +217,11 @@ Core logic is pure zsh - external pickers (fzf/skim/peco) only handle UI.
 ```
 tokenizer (pure)  →  actions (pure)  →  picker (external)
      ↓                    ↓
- _zj_words[]        jump/wrap/var
- _zj_positions[]    (O(1) lookup)
+ _ze_words[]        jump/wrap/var
+ _ze_positions[]    (O(1) lookup)
 ```
 
-The single-pass tokenizer records word positions during parsing. Actions access `_zj_positions[$idx]` directly for O(1) lookup.
+The single-pass tokenizer records word positions during parsing. Actions access `_ze_positions[$idx]` directly for O(1) lookup.
 
 See [docs/design.md](docs/design.md) for engineering details.
 
@@ -233,14 +235,14 @@ CI measures and enforces thresholds on every commit:
 | **Parse** | Tokenize a 10-word command 100× | < 150ms |
 | **Leak** | Memory delta after 10 load/unload cycles | < 400KB |
 
-**Leak** checks for memory that isn't freed on `zsh-jumper-unload`. A 5-cycle warmup runs first (zsh internals allocate once), then 10 more cycles. Growth beyond 400KB fails CI.
+**Leak** checks for memory that isn't freed on `zledit-unload`. A 5-cycle warmup runs first (zsh internals allocate once), then 10 more cycles. Growth beyond 400KB fails CI.
 
 ## Extensibility (Advanced)
 
 The plugin works out of the box with built-in actions. For power users who want custom behavior, extensibility is opt-in via TOML config:
 
 ```zsh
-zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
+zstyle ':zledit:' config ~/.config/zledit/config.toml
 ```
 
 ```toml
@@ -248,18 +250,18 @@ zstyle ':zsh-jumper:' config ~/.config/zsh-jumper/config.toml
 [[previewers]]
 pattern = '^https?://'
 description = 'URL preview'
-script = '~/.config/zsh-jumper/scripts/url-preview.sh'
+script = '~/.config/zledit/scripts/url-preview.sh'
 
 # Custom action bound to Ctrl+U
 [[actions]]
 binding = 'ctrl-u'
 description = 'upper'
-script = '~/.config/zsh-jumper/scripts/uppercase.sh'
+script = '~/.config/zledit/scripts/uppercase.sh'
 ```
 
 User-defined actions override built-in defaults when bindings collide.
 
-**Introspection**: Run `zsh-jumper-list` to see all registered actions and previewers.
+**Introspection**: Run `zledit-list` to see all registered actions and previewers.
 
 See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts, and [docs/design.md](docs/design.md) for the technical reference.
 
@@ -273,7 +275,7 @@ Tests run in isolated subshells to ensure clean state. Covers tokenizer edge cas
 
 ## Credits
 
-The EasyMotion-style overlay hints feature was inspired by [@DehanLUO](https://github.com/DehanLUO)'s thoughtful [feature suggestion](https://github.com/Piotr1215/zsh-jumper/issues/4) and their [zsh-easymotion](https://github.com/DehanLUO/.config/blob/main/zsh/zsh-easymotion/zsh-easymotion.zsh) implementation.
+The EasyMotion-style overlay hints feature was inspired by [@DehanLUO](https://github.com/DehanLUO)'s thoughtful [feature suggestion](https://github.com/Piotr1215/zledit/issues/4) and their [zsh-easymotion](https://github.com/DehanLUO/.config/blob/main/zsh/zsh-easymotion/zsh-easymotion.zsh) implementation.
 
 ## License
 
