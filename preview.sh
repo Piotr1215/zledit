@@ -36,6 +36,17 @@ if command -v "$TOKEN" &>/dev/null; then
     fi
 fi
 
+# Variable preview
+if [[ "$TOKEN" =~ \$[A-Za-z_][A-Za-z0-9_]*|\$\{[A-Za-z_][A-Za-z0-9_]*\} ]]; then
+    while [[ "$TOKEN" =~ (\$\{?[A-Za-z_][A-Za-z0-9_]*\}?) ]]; do
+        var_ref="${BASH_REMATCH[1]}"
+        var_name="${var_ref#\$}"; var_name="${var_name#\{}"; var_name="${var_name%\}}"
+        printf "\033[33m%s\033[0m = %s\n" "$var_ref" "${!var_name:-<unset>}"
+        TOKEN="${TOKEN/${var_ref}/}"
+    done
+    exit 0
+fi
+
 # File/directory preview (with colors)
 if [[ -d "$TOKEN" ]]; then
     ls -la --color=always "$TOKEN" 2>/dev/null
