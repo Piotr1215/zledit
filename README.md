@@ -13,7 +13,7 @@ Long commands are tedious to navigate. Instead of holding arrow keys or `Ctrl+Le
 ```bash
 $ kubectl get pods -n kube-system --output wide
                     ▲
-              [Ctrl+X /]
+              [Alt+/]
                     │
 → [a]kubectl [s]get [d]pods [f]-n [g]kube-system [h]--output [j]wide   ← overlay
 ┌─────────────────────────────────────┬────────────────────────────────────────┐
@@ -49,7 +49,14 @@ Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump dir
 
 ## Requirements
 
-One of: [fzf](https://github.com/junegunn/fzf), [sk/skim](https://github.com/lotabout/skim), [peco](https://github.com/peco/peco), or [percol](https://github.com/mooz/percol)
+| Dependency | Minimum Version | Check |
+|------------|-----------------|-------|
+| zsh | 5.3+ | `zsh --version` |
+| fzf | 0.36.0+ | `fzf --version` |
+
+Alternative pickers (instead of fzf): [sk/skim](https://github.com/lotabout/skim), [peco](https://github.com/peco/peco), [percol](https://github.com/mooz/percol)
+
+> **Note:** System package managers often ship outdated fzf (e.g., Ubuntu/Debian ships 0.29). Install from [GitHub releases](https://github.com/junegunn/fzf/releases) or via `git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf && ~/.fzf/install`
 
 ## Installation
 
@@ -98,7 +105,7 @@ source /path/to/zledit/zledit.plugin.zsh
 
 ## Usage
 
-Press `Ctrl+X /` (default) on a command line with multiple words. Select a word to jump cursor there.
+Press `Alt+/` (default) on a command line with multiple words. Select a word to jump cursor there.
 
 ### FZF Actions (inside picker)
 
@@ -169,8 +176,8 @@ For vi mode users, bind to both insert and command modes:
 
 ```zsh
 zstyle ':zledit:' disable-bindings yes
-bindkey -M viins '^X/' zledit-widget
-bindkey -M vicmd '^X/' zledit-widget
+bindkey -M viins '^[/' zledit-widget
+bindkey -M vicmd '^[/' zledit-widget
 ```
 
 ## Configuration
@@ -187,8 +194,8 @@ zstyle ':zledit:' picker-opts '--height=50% --reverse --border'
 # Cursor position after jump: start (default), middle, end
 zstyle ':zledit:' cursor end
 
-# Custom keybinding (default: ^X/)
-zstyle ':zledit:' binding '^J'
+# Custom keybinding (default: ^[/ i.e. Alt+/)
+zstyle ':zledit:' binding '^X^J'  # Ctrl+X Ctrl+J
 
 # Disable default keybinding (define your own)
 zstyle ':zledit:' disable-bindings yes

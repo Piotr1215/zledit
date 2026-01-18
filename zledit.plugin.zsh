@@ -129,6 +129,22 @@ _zledit_load_default_actions() {
     done
 }
 
+_zledit_check_fzf_version() {
+    emulate -L zsh
+    local version_str min_version="0.36.0"
+    version_str="$(fzf --version 2>/dev/null | awk '{print $1}')"
+    [[ -z "$version_str" ]] && return 1
+
+    # Compare versions (major.minor.patch)
+    local -a cur=(${(s:.:)version_str}) min=(${(s:.:)min_version})
+    local i
+    for i in 1 2 3; do
+        (( ${cur[$i]:-0} > ${min[$i]:-0} )) && return 0
+        (( ${cur[$i]:-0} < ${min[$i]:-0} )) && return 1
+    done
+    return 0
+}
+
 _zledit_load_config() {
     emulate -L zsh
     local val
@@ -181,6 +197,13 @@ _zledit_load_config() {
         Zledit[picker]="peco"
     elif (( $+commands[percol] )); then
         Zledit[picker]="percol"
+    fi
+
+    # Version check for fzf (requires 0.36.0+ for start:/rebind/unbind)
+    if [[ "${Zledit[picker]}" == fzf* ]] && ! _zledit_check_fzf_version; then
+        print -u2 "zledit: fzf 0.36.0+ required (found: $(fzf --version 2>/dev/null | awk '{print $1}'))"
+        print -u2 "zledit: install from https://github.com/junegunn/fzf/releases"
+        Zledit[picker]=""
     fi
 
     # Load default actions (after user config, so user can override)
@@ -690,7 +713,7 @@ zledit-setup-bindings() {
     fi
 
     local key
-    zstyle -s ':zledit:' binding key || key='^X/'
+    zstyle -s ':zledit:' binding key || key='^[/'  # Alt+/ (fzf uses Alt+C pattern)
     bindkey "$key" zledit-widget
 }
 
