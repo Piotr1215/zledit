@@ -2,6 +2,7 @@
 
 **Z**sh **L**ine **Edit**or toolkit - fuzzy navigation and in-place editing for your command line.
 
+[![Mentioned in Awesome](https://awesome.re/mentioned-badge.svg)](https://github.com/unixorn/awesome-zsh-plugins)
 [![Load](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-load.json)](#metrics)
 [![Parse](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-tokenize.json)](#metrics)
 [![Leak](https://img.shields.io/endpoint?cacheSeconds=300&url=https%3A%2F%2Fgist.githubusercontent.com%2FPiotr1215%2Fff146261d69233bc22353774c4540492%2Fraw%2Fzledit-memory.json)](#metrics)
@@ -13,7 +14,7 @@ Long commands are tedious to navigate. Instead of holding arrow keys or `Ctrl+Le
 ```bash
 $ kubectl get pods -n kube-system --output wide
                     ▲
-              [Ctrl+X /]
+              [Alt+/]
                     │
 → [a]kubectl [s]get [d]pods [f]-n [g]kube-system [h]--output [j]wide   ← overlay
 ┌─────────────────────────────────────┬────────────────────────────────────────┐
@@ -41,7 +42,7 @@ Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump dir
 - **Overlay hints**: EasyMotion-style `[a] [s] [d]` labels on command line for instant jump
 - **Instant jump**: Press `;` then a letter to jump without fuzzy searching
 - **Configurable**: Custom keybindings, picker options via zstyle
-- **Fast**: ~0.2ms load time (see [Performance](#performance))
+- **Fast**: ~0.2ms load time (see [Metrics](#metrics))
 - **Wrap/Surround**: Wrap tokens in quotes, brackets, or command substitution
 - **Move/Swap**: Swap token positions via secondary picker
 - **Variable extraction**: Convert tokens to shell variables
@@ -49,56 +50,88 @@ Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump dir
 
 ## Requirements
 
-One of: [fzf](https://github.com/junegunn/fzf), [sk/skim](https://github.com/lotabout/skim), [peco](https://github.com/peco/peco), or [percol](https://github.com/mooz/percol)
+| Dependency | Minimum Version | Check |
+|------------|-----------------|-------|
+| zsh | 5.3+ | `zsh --version` |
+| fzf | 0.36.0+ | `fzf --version` |
+
+Alternative pickers (instead of fzf): [sk/skim](https://github.com/lotabout/skim), [peco](https://github.com/peco/peco), [percol](https://github.com/mooz/percol)
+
+> **Note:** System package managers often ship outdated fzf (e.g., Ubuntu/Debian ships 0.29). Install from [GitHub releases](https://github.com/junegunn/fzf/releases) or via `git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf && ~/.fzf/install`
 
 ## Installation
 
-### zinit
+Pick your plugin manager, then verify with `Alt+/` on any command.
+
+<details>
+<summary><b>zinit</b></summary>
 
 ```zsh
+# Add to .zshrc
 zinit light Piotr1215/zledit
 ```
+</details>
 
-### antigen
+<details>
+<summary><b>antigen</b></summary>
 
 ```zsh
+# Add to .zshrc
 antigen bundle Piotr1215/zledit
 ```
+</details>
 
-### oh-my-zsh
+<details>
+<summary><b>oh-my-zsh</b></summary>
 
-```sh
-git clone https://github.com/Piotr1215/zledit ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zledit
-```
+```bash
+# 1. Clone to oh-my-zsh custom plugins
+git clone https://github.com/Piotr1215/zledit \
+    ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zledit
 
-Then add `zledit` to plugins in `.zshrc`:
-
-```zsh
+# 2. Add to plugins array in ~/.zshrc
 plugins=(... zledit)
+
+# 3. Restart shell or run: source ~/.zshrc
 ```
 
-### sheldon
+Verify oh-my-zsh path: `echo ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}`
+</details>
+
+<details>
+<summary><b>sheldon</b></summary>
 
 ```toml
+# Add to ~/.config/sheldon/plugins.toml
 [plugins.zledit]
 github = "Piotr1215/zledit"
 ```
+</details>
 
-### zplug
+<details>
+<summary><b>zplug</b></summary>
 
 ```zsh
+# Add to .zshrc
 zplug "Piotr1215/zledit"
 ```
+</details>
 
-### Manual
+<details>
+<summary><b>Manual</b></summary>
 
-```zsh
-source /path/to/zledit/zledit.plugin.zsh
+```bash
+# Clone anywhere
+git clone https://github.com/Piotr1215/zledit ~/.zledit
+
+# Add to .zshrc
+source ~/.zledit/zledit.plugin.zsh
 ```
+</details>
 
 ## Usage
 
-Press `Ctrl+X /` (default) on a command line with multiple words. Select a word to jump cursor there.
+Press `Alt+/` (default) on a command line with multiple words. Select a word to jump cursor there.
 
 ### FZF Actions (inside picker)
 
@@ -121,20 +154,6 @@ Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in th
 
 **Complex edits**: For heavy multiline editing, `Ctrl+X Ctrl+E` (edit in `$EDITOR`) still shines. zledit is for quick navigation and token manipulation.
 
-**Custom FZF keys** (if defaults conflict with your setup):
-```zsh
-zstyle ':zledit:' fzf-wrap-key 'ctrl-s'
-zstyle ':zledit:' fzf-var-key 'ctrl-e'
-zstyle ':zledit:' fzf-replace-key 'ctrl-r'
-zstyle ':zledit:' fzf-move-key 'ctrl-m'
-zstyle ':zledit:' fzf-instant-key ';'    # key to enter instant mode
-```
-
-**Disable overlay hints**:
-```zsh
-zstyle ':zledit:' overlay off
-```
-
 ### Preview Panel (FZF only)
 
 The preview panel shows contextual information:
@@ -143,12 +162,7 @@ The preview panel shows contextual information:
 - **Files**: Content preview via `bat` (or `head`)
 - **Directories**: `ls -la` listing
 
-Scroll preview with `Ctrl+D` / `Ctrl+U`.
-
-```zsh
-zstyle ':zledit:' preview off              # disable
-zstyle ':zledit:' preview-window 'bottom:40%'  # position
-```
+Scroll preview with `Ctrl+D` / `Ctrl+U`. See [Configuration](#configuration) for options.
 
 ### Multiline Commands
 
@@ -163,52 +177,45 @@ $ docker run -d \
 
 Words are split on whitespace (spaces, tabs, newlines). Line continuation backslashes are filtered out, so you see only actual command tokens in the picker.
 
-### Vi mode
-
-For vi mode users, bind to both insert and command modes:
-
-```zsh
-zstyle ':zledit:' disable-bindings yes
-bindkey -M viins '^X/' zledit-widget
-bindkey -M vicmd '^X/' zledit-widget
-```
-
 ## Configuration
 
-Configure via zstyle in your `.zshrc` **before** loading the plugin:
+All options use zstyle. Set in `.zshrc` **before** loading the plugin.
 
 ```zsh
-# Force specific picker (default: auto-detect)
+# Picker: fzf (default), fzf-tmux, sk, peco, percol
 zstyle ':zledit:' picker fzf
-
-# Custom picker options
 zstyle ':zledit:' picker-opts '--height=50% --reverse --border'
+
+# Keybinding (default: Alt+/)
+zstyle ':zledit:' binding '^X^J'        # Ctrl+X Ctrl+J
+zstyle ':zledit:' disable-bindings yes  # manual binding only
 
 # Cursor position after jump: start (default), middle, end
 zstyle ':zledit:' cursor end
 
-# Custom keybinding (default: ^X/)
-zstyle ':zledit:' binding '^J'
+# Overlay hints on command line
+zstyle ':zledit:' overlay off           # disable [a] [s] [d] hints
 
-# Disable default keybinding (define your own)
+# Preview panel
+zstyle ':zledit:' preview off           # disable
+zstyle ':zledit:' preview-window 'bottom:40%'
+
+# FZF action keys (if defaults conflict with your setup)
+zstyle ':zledit:' fzf-wrap-key 'ctrl-s'
+zstyle ':zledit:' fzf-var-key 'ctrl-e'
+zstyle ':zledit:' fzf-replace-key 'ctrl-r'
+zstyle ':zledit:' fzf-move-key 'ctrl-m'
+zstyle ':zledit:' fzf-instant-key ';'
+
+# Vi mode: bind to both insert and command modes
 zstyle ':zledit:' disable-bindings yes
-bindkey '^X^J' zledit-widget
+bindkey -M viins '^[/' zledit-widget
+bindkey -M vicmd '^[/' zledit-widget
 ```
 
-**List registered config:**
+**Inspect config:** `zledit-list` shows registered paths, actions, previewers.
 
-```bash
-zledit-list  # shows config paths, actions, previewers
-```
-
-## Picker Priority
-
-1. Explicit `zstyle ':zledit:' picker`
-2. `fzf-tmux` (when `$TMUX` is set)
-3. `fzf`
-4. `sk` (skim)
-5. `peco`
-6. `percol`
+**Picker priority:** explicit picker setting → fzf-tmux (in tmux) → fzf → sk → peco → percol
 
 ## Architecture
 
@@ -261,17 +268,13 @@ script = '~/.config/zledit/scripts/uppercase.sh'
 
 User-defined actions override built-in defaults when bindings collide.
 
-**Introspection**: Run `zledit-list` to see all registered actions and previewers.
-
-See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts, and [docs/design.md](docs/design.md) for the technical reference.
+See [docs/extensibility-guide.md](docs/extensibility-guide.md) for writing custom scripts.
 
 ## Testing
 
 ```bash
 zsh tests/test_plugin.zsh
 ```
-
-Tests run in isolated subshells to ensure clean state. Covers tokenizer edge cases (unicode, special chars, long buffers), action behavior, and integration.
 
 ## Credits
 
