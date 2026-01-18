@@ -2344,6 +2344,91 @@ EOF
     fi
 }
 
+test_fd3_metadata_mode_replace() {
+    local result tmpdir script
+    tmpdir=$(mktemp -d)
+    script="$tmpdir/fd3_replace.sh"
+    cat > "$script" << 'EOF'
+#!/bin/bash
+echo "REPLACED BUFFER"
+echo "mode:replace" >&3
+echo "cursor:5" >&3
+EOF
+    chmod +x "$script"
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _ze_words=(hello world)
+        _ze_positions=(0 6)
+        _ze_action_scripts=('$script')
+        BUFFER='hello world'
+        CURSOR=0
+        _zledit_do_custom_action 1 '1: hello'
+        echo \"BUFFER:\$BUFFER|CURSOR:\$CURSOR\"
+    " 2>&1)
+    rm -rf "$tmpdir"
+    if [[ "$result" == "BUFFER:REPLACED BUFFER|CURSOR:5" ]]; then
+        test_pass "fd 3 metadata mode:replace works"
+    else
+        test_fail "fd 3 mode:replace" "Expected: BUFFER:REPLACED BUFFER|CURSOR:5, Got: $result"
+    fi
+}
+
+test_fd3_metadata_mode_error() {
+    local result tmpdir script
+    tmpdir=$(mktemp -d)
+    script="$tmpdir/fd3_error.sh"
+    cat > "$script" << 'EOF'
+#!/bin/bash
+echo "mode:error" >&3
+echo "message:custom error" >&3
+EOF
+    chmod +x "$script"
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _ze_words=(hello)
+        _ze_positions=(0)
+        _ze_action_scripts=('$script')
+        BUFFER='hello'
+        _zledit_do_custom_action 1 '1: hello'
+        echo \"exit:\$?\"
+    " 2>&1)
+    rm -rf "$tmpdir"
+    if [[ "$result" == *"exit:1"* ]]; then
+        test_pass "fd 3 metadata mode:error works"
+    else
+        test_fail "fd 3 mode:error" "Expected exit:1, Got: $result"
+    fi
+}
+
+test_fd3_fallback_to_exit_codes() {
+    local result tmpdir script
+    tmpdir=$(mktemp -d)
+    script="$tmpdir/legacy.sh"
+    cat > "$script" << 'EOF'
+#!/bin/bash
+# No fd 3 output - should use exit code
+echo "LEGACY OUTPUT"
+exit 0
+EOF
+    chmod +x "$script"
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        _ze_words=(hello)
+        _ze_positions=(0)
+        _ze_action_scripts=('$script')
+        BUFFER='hello'
+        CURSOR=0
+        _zledit_do_custom_action 1 '1: hello'
+        echo \"BUFFER:\$BUFFER\"
+    " 2>&1)
+    rm -rf "$tmpdir"
+    if [[ "$result" == "BUFFER:LEGACY OUTPUT" ]]; then
+        test_pass "fd 3 fallback to exit codes works"
+    else
+        test_fail "fd 3 fallback" "Expected: BUFFER:LEGACY OUTPUT, Got: $result"
+    fi
+}
+
 # ------------------------------------------------------------------------------
 # Performance tests (with thresholds)
 # ------------------------------------------------------------------------------
@@ -2554,6 +2639,9 @@ run_test test_build_preview_cmd_fallback
 run_test test_custom_action_function_exists
 run_test test_extensibility_config_loading
 run_test test_action_nonzero_exit
+run_test test_fd3_metadata_mode_replace
+run_test test_fd3_metadata_mode_error
+run_test test_fd3_fallback_to_exit_codes
 run_test test_unload_cleans_extensibility
 
 # Performance tests
