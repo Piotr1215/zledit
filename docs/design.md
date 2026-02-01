@@ -303,26 +303,50 @@ Environment variables:
 - `ZJ_CURSOR` = current cursor position
 - `ZJ_PICKER` = active picker (fzf, fzf-tmux, sk, peco, percol)
 
-**Exit codes:**
+**Output Protocol (fd 3):**
+
+Actions output the new buffer to stdout and metadata to file descriptor 3:
+
+```bash
+#!/usr/bin/env bash
+TOKEN="$1"
+upper=$(echo "$TOKEN" | tr '[:lower:]' '[:upper:]')
+
+# New buffer to stdout
+echo "${ZJ_BUFFER//$TOKEN/$upper}"
+
+# Metadata to fd 3 (skip if not open)
+if [[ -e /dev/fd/3 ]]; then
+    echo "mode:replace" >&3
+    echo "cursor:10" >&3
+fi
+```
+
+| Key | Value | Description |
+|-----|-------|-------------|
+| `mode` | `replace` | Apply stdout as new buffer (default) |
+| | `display` | Print stdout to terminal, don't change buffer |
+| | `pushline` | Save buffer, show `pushline:` command for user to execute |
+| | `pushline-exec` | Save buffer, execute `pushline:` command immediately |
+| | `error` | Show `message:` as error, abort |
+| `cursor` | `N` | Set cursor to position N |
+| `pushline` | `cmd` | Command to show/execute (for pushline modes) |
+| `message` | `text` | Error message (for error mode) |
+
+**Legacy Exit Codes:**
+
+For backwards compatibility when fd 3 is not used:
 - 0 = apply stdout as new buffer (supports CURSOR:N override)
 - 1 = error, show stderr message
 - 2 = display mode (print stdout, no buffer change)
 - 3 = push-line (format: `buffer\n---ZJ_PUSHLINE---\ncommand`, user presses Enter)
 - 4 = push-line + auto-execute (same format, executes immediately)
 
-**History avoidance:** For exit codes 3/4, prepend a space to the pushed command:
+**History avoidance:** For pushline modes, prepend a space to the pushed command:
 ```bash
 echo " ${EDITOR:-vim} \"$file\""  # leading space = skipped by HIST_IGNORE_SPACE
 ```
 Prevents helper commands from polluting shell history.
-
-**Cursor position (optional):**
-
-By default, cursor stays at the original token position. Override with `CURSOR:N`:
-```
-new buffer content
-CURSOR:42
-```
 
 **Example action script:**
 
@@ -346,7 +370,14 @@ upper=$(echo "$TOKEN" | tr '[:lower:]' '[:upper:]')
 
 # Replace in buffer
 end_pos=$((pos + ${#TOKEN}))
-echo "${ZJ_BUFFER:0:$pos}${upper}${ZJ_BUFFER:$end_pos}"
+new_buffer="${ZJ_BUFFER:0:$pos}${upper}${ZJ_BUFFER:$end_pos}"
+
+echo "$new_buffer"
+
+# Metadata via fd 3
+if [[ -e /dev/fd/3 ]]; then
+    echo "mode:replace" >&3
+fi
 ```
 
 See `examples/` for more sample scripts.
