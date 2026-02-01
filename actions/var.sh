@@ -2,8 +2,8 @@
 # zledit action: var (extract to variable)
 # Args: $1 = token, $2 = index (1-based)
 # Env:  ZJ_BUFFER, ZJ_POSITIONS
-# Output: new buffer + push-line content (separated by ---ZJ_PUSHLINE---)
-# Exit: 3 (push-line mode)
+# Output: new buffer to stdout
+# Metadata: mode:pushline, pushline command via fd 3
 
 set -eo pipefail
 
@@ -38,9 +38,11 @@ new_buffer="${ZJ_BUFFER:0:$pos}\"\$${var_name}\"${ZJ_BUFFER:$end_pos}"
 escaped_base="${base//\"/\\\"}"
 pushed_line="export ${var_name}=\"${escaped_base}\""
 
-# Output in push-line format
+# Output new buffer to stdout
 echo "$new_buffer"
-echo "---ZJ_PUSHLINE---"
-echo "$pushed_line"
 
-exit 3
+# Metadata via fd 3 (skip if fd 3 not open)
+if [[ -e /dev/fd/3 ]]; then
+    echo "mode:pushline" >&3
+    echo "pushline:$pushed_line" >&3
+fi
