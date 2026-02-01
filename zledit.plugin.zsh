@@ -600,8 +600,15 @@ _zledit_do_jump() {
 #         ZJ_WORDS = newline-separated tokens
 #         ZJ_POSITIONS = newline-separated positions (0-based byte offsets)
 #         ZJ_CURSOR = current cursor position
-#   stdout: new command line (replaces BUFFER)
-#   exit codes:
+#   stdout: new command line content
+#
+#   fd 3 metadata (preferred):
+#     mode:replace|display|pushline|pushline-exec|error
+#     cursor:N
+#     pushline:command to execute
+#     message:error or info message
+#
+#   exit codes (legacy fallback, used when fd 3 is empty):
 #     0 = apply stdout as new BUFFER
 #     1 = error (show stderr)
 #     2 = display mode (show stdout in terminal, no buffer change)
@@ -627,19 +634,80 @@ _zledit_do_custom_action() {
     (( token_idx < 1 || token_idx > ${#_ze_words[@]} )) && return 1
     local token="${_ze_words[$token_idx]}"
 
-    # Export environment for script
-    local result stderr_file=$(mktemp)
-    result=$(
-        export ZJ_BUFFER="$BUFFER"
-        export ZJ_WORDS="${(pj:\n:)_ze_words}"
-        export ZJ_POSITIONS="${(pj:\n:)_ze_positions}"
-        export ZJ_CURSOR="$CURSOR"
-        export ZJ_PICKER="${Zledit[picker]}"
-        "$script" "$token" "$token_idx" 2>"$stderr_file"
-    )
+    # Export environment for script, capture stdout, stderr, and fd 3 (metadata)
+    local result stderr_file=$(mktemp) meta_file=$(mktemp)
+    {
+        exec 3>"$meta_file"
+        result=$(
+            export ZJ_BUFFER="$BUFFER"
+            export ZJ_WORDS="${(pj:\n:)_ze_words}"
+            export ZJ_POSITIONS="${(pj:\n:)_ze_positions}"
+            export ZJ_CURSOR="$CURSOR"
+            export ZJ_PICKER="${Zledit[picker]}"
+            "$script" "$token" "$token_idx" 2>"$stderr_file" 3>&3
+        )
+        exec 3>&-
+    }
     local exit_code=$?
     local stderr_out=$(<"$stderr_file"); rm -f "$stderr_file"
+    local meta_out=$(<"$meta_file"); rm -f "$meta_file"
 
+    # Parse fd 3 metadata if present
+    local meta_mode="" meta_cursor="" meta_pushline="" meta_message=""
+    if [[ -n "$meta_out" ]]; then
+        local line
+        while IFS= read -r line; do
+            case "$line" in
+                mode:*)     meta_mode="${line#mode:}" ;;
+                cursor:*)   meta_cursor="${line#cursor:}" ;;
+                pushline:*) meta_pushline="${line#pushline:}" ;;
+                message:*)  meta_message="${line#message:}" ;;
+            esac
+        done <<< "$meta_out"
+    fi
+
+    # Use fd 3 metadata if mode is set, otherwise fall back to exit codes
+    if [[ -n "$meta_mode" ]]; then
+        case "$meta_mode" in
+            replace)
+                if [[ -n "$result" ]]; then
+                    BUFFER="${result%$'\n'}"
+                    if [[ -n "$meta_cursor" ]]; then
+                        CURSOR="$meta_cursor"
+                    else
+                        CURSOR="${_ze_positions[$token_idx]}"
+                    fi
+                fi
+                ;;
+            display)
+                if [[ -n "$result" ]]; then
+                    print
+                    print -r -- "$result"
+                    print
+                fi
+                ;;
+            pushline)
+                BUFFER="${result%$'\n'}"
+                CURSOR="${_ze_positions[$token_idx]}"
+                zle push-line
+                BUFFER="$meta_pushline"
+                CURSOR="${meta_cursor:-${#BUFFER}}"
+                ;;
+            pushline-exec)
+                BUFFER="${result%$'\n'}"
+                zle push-line
+                BUFFER="$meta_pushline"
+                zle accept-line
+                ;;
+            error)
+                zle -M "zledit: ${meta_message:-action failed}"
+                return 1
+                ;;
+        esac
+        return 0
+    fi
+
+    # Legacy: fall back to exit code behavior
     case $exit_code in
         0)  # Apply stdout as new buffer (CURSOR:N overrides, else token position)
             if [[ -n "$result" ]]; then

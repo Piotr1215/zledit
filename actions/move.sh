@@ -58,3 +58,6 @@ if (( src_pos < dest_pos )); then
 else
     echo "${ZJ_BUFFER:0:$dest_pos}${src_word}${ZJ_BUFFER:$((dest_pos + ${#dest_word})):$((src_pos - dest_pos - ${#dest_word}))}${dest_word}${ZJ_BUFFER:$((src_pos + ${#src_word}))}"
 fi
+
+# Metadata via fd 3 (skip if fd 3 not open)
+[[ -e /dev/fd/3 ]] && echo "mode:replace" >&3

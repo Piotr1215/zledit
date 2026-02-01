@@ -2,8 +2,8 @@
 # zledit action: replace (delete token)
 # Args: $1 = token, $2 = index (1-based)
 # Env:  ZJ_BUFFER, ZJ_POSITIONS
-# Output: new buffer with token removed + cursor position
-# Exit: 0
+# Output: new buffer with token removed
+# Metadata: mode:replace, cursor at deletion point
 
 set -eo pipefail
 
@@ -21,5 +21,11 @@ pos="${positions[$((INDEX - 1))]}"
 # Calculate end position
 end_pos=$((pos + ${#TOKEN}))
 
-# Remove token from buffer (cursor defaults to token position)
+# Output new buffer to stdout
 echo "${ZJ_BUFFER:0:$pos}${ZJ_BUFFER:$end_pos}"
+
+# Metadata via fd 3 (skip if fd 3 not open)
+if [[ -e /dev/fd/3 ]]; then
+    echo "mode:replace" >&3
+    echo "cursor:$pos" >&3
+fi

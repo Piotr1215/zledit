@@ -67,37 +67,73 @@ Your script receives:
 | `ZJ_CURSOR` | Current cursor position |
 | `ZJ_PICKER` | Active picker (fzf, fzf-tmux, sk) |
 
-### Output & Exit Codes
+### Output
+
+Scripts communicate back to zledit via two channels:
+- **stdout** - the new buffer content
+- **fd 3** - metadata (mode, cursor position, etc.)
+
+#### fd 3 Metadata Protocol (Recommended)
+
+Write key:value pairs to file descriptor 3:
+
+```bash
+#!/usr/bin/env bash
+TOKEN="$1"
+upper=$(echo "$TOKEN" | tr '[:lower:]' '[:upper:]')
+
+# Output new buffer to stdout
+echo "${ZJ_BUFFER//$TOKEN/$upper}"
+
+# Send metadata to fd 3
+echo "mode:replace" >&3
+echo "cursor:10" >&3
+```
+
+Available metadata keys:
+
+| Key | Value | Description |
+|-----|-------|-------------|
+| `mode` | `replace` | Apply stdout as new buffer (default) |
+| | `display` | Print stdout to terminal, don't change buffer |
+| | `pushline` | Save buffer, show `pushline:` command for user to execute |
+| | `pushline-exec` | Save buffer, execute `pushline:` command immediately |
+| | `error` | Show `message:` as error, abort |
+| `cursor` | `N` | Set cursor to position N |
+| `pushline` | `cmd` | Command to show/execute (for pushline modes) |
+| `message` | `text` | Error message (for error mode) |
+
+**Example: Variable extraction with fd 3**
+```bash
+#!/usr/bin/env bash
+TOKEN="$1"
+var_name=$(echo "$TOKEN" | tr '[:lower:]-' '[:upper:]_')
+
+# New buffer with variable reference
+echo "${ZJ_BUFFER//$TOKEN/\"\$${var_name}\"}"
+
+# Metadata
+echo "mode:pushline" >&3
+echo "pushline:${var_name}=\"${TOKEN}\"" >&3
+echo "cursor:0" >&3
+```
+
+#### Exit Codes (Legacy)
+
+For backwards compatibility, exit codes still work when fd 3 is empty:
 
 | Exit | Behavior |
 |------|----------|
 | 0 | Apply stdout as new buffer |
 | 1 | Error - show stderr message |
 | 2 | Display mode - print stdout, no buffer change |
-| 3 | Push-line - save buffer, show pushed command (user presses Enter) |
-| 4 | Push-line + auto-execute - save buffer, execute pushed command immediately |
+| 3 | Push-line (format: `buffer\n---ZJ_PUSHLINE---\ncommand`) |
+| 4 | Push-line + auto-execute |
 
-For exit codes 3 and 4, use this output format:
+Legacy cursor override (last line of stdout):
 ```
-original_buffer_to_restore
----ZJ_PUSHLINE---
-command_to_execute
-```
-
-Example: Smart edit action that opens files in editor then returns to original command:
-```bash
-echo "$ZJ_BUFFER"
-echo "---ZJ_PUSHLINE---"
-echo "\${EDITOR:-vim} \"$TOKEN\""
-exit 4
-```
-
-### Cursor Position
-
-By default, cursor stays at the original token position. To override, add `CURSOR:N` as the last line:
-```
-echo hello world
-CURSOR:5
+echo "new buffer"
+echo "CURSOR:5"
 ```
 
 ### Nested Pickers

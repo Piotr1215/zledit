@@ -2,8 +2,8 @@
 # zledit action: wrap (wrap token with quotes/brackets)
 # Args: $1 = token, $2 = index (1-based)
 # Env:  ZJ_BUFFER, ZJ_POSITIONS, ZJ_PICKER (optional: fzf-tmux, fzf, sk)
-# Output: new buffer with wrapped token
-# Exit: 0
+# Output: new buffer to stdout
+# Metadata: mode:replace, cursor position via fd 3
 
 set -eo pipefail
 
@@ -77,5 +77,11 @@ new_buffer="${ZJ_BUFFER:0:$pos}${open}${TOKEN}${close}${ZJ_BUFFER:$end_pos}"
 # Cursor after opening wrapper (on the wrapped content)
 cursor_pos=$((pos + ${#open}))
 
+# Output new buffer to stdout
 echo "$new_buffer"
-echo "CURSOR:${cursor_pos}"
+
+# Metadata via fd 3 (skip if fd 3 not open)
+if [[ -e /dev/fd/3 ]]; then
+    echo "mode:replace" >&3
+    echo "cursor:$cursor_pos" >&3
+fi
