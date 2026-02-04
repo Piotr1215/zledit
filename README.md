@@ -53,7 +53,7 @@ Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump dir
 | Dependency | Minimum Version | Check |
 |------------|-----------------|-------|
 | zsh | 5.3+ | `zsh --version` |
-| fzf | 0.36.0+ | `fzf --version` |
+| fzf | 0.53.0+ | `fzf --version` |
 
 Alternative pickers (instead of fzf): [sk/skim](https://github.com/lotabout/skim), [peco](https://github.com/peco/peco), [percol](https://github.com/mooz/percol)
 

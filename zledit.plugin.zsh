@@ -131,7 +131,7 @@ _zledit_load_default_actions() {
 
 _zledit_check_fzf_version() {
     emulate -L zsh
-    local version_str min_version="0.36.0"
+    local version_str min_version="0.53.0"
     version_str="$(fzf --version 2>/dev/null | awk '{print $1}')"
     [[ -z "$version_str" ]] && return 1
 
@@ -199,9 +199,9 @@ _zledit_load_config() {
         Zledit[picker]="percol"
     fi
 
-    # Version check for fzf (requires 0.36.0+ for start:/rebind/unbind)
+    # Version check for fzf (requires 0.53.0+ for print() action)
     if [[ "${Zledit[picker]}" == fzf* ]] && ! _zledit_check_fzf_version; then
-        print -u2 "zledit: fzf 0.36.0+ required (found: $(fzf --version 2>/dev/null | awk '{print $1}'))"
+        print -u2 "zledit: fzf 0.53.0+ required (found: $(fzf --version 2>/dev/null | awk '{print $1}'))"
         print -u2 "zledit: install from https://github.com/junegunn/fzf/releases"
         Zledit[picker]=""
     fi
