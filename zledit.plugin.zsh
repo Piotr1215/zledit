@@ -108,6 +108,8 @@ _zledit_load_default_actions() {
         "${Zledit[var-key]}:var:${dir}/var.sh"
         "${Zledit[replace-key]}:replace:${dir}/replace.sh"
         "${Zledit[move-key]}:move:${dir}/move.sh"
+        "${Zledit[dup-key]}:dup:${dir}/dup.sh"
+        "${Zledit[path-key]}:path:${dir}/path.sh"
     )
 
     local entry binding desc script
@@ -161,6 +163,8 @@ _zledit_load_config() {
     zstyle -s ':zledit:' fzf-var-key val; Zledit[var-key]="${val:-ctrl-e}"
     zstyle -s ':zledit:' fzf-replace-key val; Zledit[replace-key]="${val:-ctrl-r}"
     zstyle -s ':zledit:' fzf-move-key val; Zledit[move-key]="${val:-ctrl-t}"
+    zstyle -s ':zledit:' fzf-dup-key val; Zledit[dup-key]="${val:-alt-d}"
+    zstyle -s ':zledit:' fzf-path-key val; Zledit[path-key]="${val:-ctrl-p}"
     zstyle -s ':zledit:' fzf-instant-key val; Zledit[instant-key]="${val:-;}"
     zstyle -s ':zledit:' debug val; Zledit[debug]="${val:-off}"
 

@@ -122,6 +122,8 @@ test_action_scripts_exist() {
     [[ ! -x "$PLUGIN_DIR/actions/var.sh" ]] && missing+=" var.sh"
     [[ ! -x "$PLUGIN_DIR/actions/replace.sh" ]] && missing+=" replace.sh"
     [[ ! -x "$PLUGIN_DIR/actions/move.sh" ]] && missing+=" move.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/dup.sh" ]] && missing+=" dup.sh"
+    [[ ! -x "$PLUGIN_DIR/actions/path.sh" ]] && missing+=" path.sh"
 
     if [[ -z "$missing" ]]; then
         test_pass "Action scripts exist and are executable"
@@ -1422,6 +1424,83 @@ test_move_exits_on_single_token() {
     fi
 }
 
+# Dup action tests
+test_dup_basic() {
+    local result
+    result=$(
+        export ZJ_BUFFER="cp file.txt dest"
+        export ZJ_POSITIONS=$'0\n3\n12'
+        "$PLUGIN_DIR/actions/dup.sh" "file.txt" "2" 2>&1
+    )
+
+    if [[ "$result" == "cp file.txt file.txt dest" ]]; then
+        test_pass "Dup duplicates token"
+    else
+        test_fail "Dup basic" "Expected: 'cp file.txt file.txt dest', Got: '$result'"
+    fi
+}
+
+test_dup_last_token() {
+    local result
+    result=$(
+        export ZJ_BUFFER="echo hello"
+        export ZJ_POSITIONS=$'0\n5'
+        "$PLUGIN_DIR/actions/dup.sh" "hello" "2" 2>&1
+    )
+
+    if [[ "$result" == "echo hello hello" ]]; then
+        test_pass "Dup last token"
+    else
+        test_fail "Dup last token" "Expected: 'echo hello hello', Got: '$result'"
+    fi
+}
+
+test_dup_first_token() {
+    local result
+    result=$(
+        export ZJ_BUFFER="kubectl get pods"
+        export ZJ_POSITIONS=$'0\n8\n12'
+        "$PLUGIN_DIR/actions/dup.sh" "kubectl" "1" 2>&1
+    )
+
+    if [[ "$result" == "kubectl kubectl get pods" ]]; then
+        test_pass "Dup first token"
+    else
+        test_fail "Dup first token" "Expected: 'kubectl kubectl get pods', Got: '$result'"
+    fi
+}
+
+test_dup_fd3_metadata() {
+    local tmpdir meta_file result
+    tmpdir=$(mktemp -d)
+    meta_file="$tmpdir/meta"
+
+    result=$(
+        export ZJ_BUFFER="cp a b"
+        export ZJ_POSITIONS=$'0\n3\n5'
+        "$PLUGIN_DIR/actions/dup.sh" "a" "2" 3>"$meta_file"
+    )
+
+    local metadata
+    metadata=$(<"$meta_file")
+    rm -rf "$tmpdir"
+
+    if [[ "$metadata" == *"mode:replace"* && "$metadata" == *"cursor:5"* ]]; then
+        test_pass "Dup fd3 metadata"
+    else
+        test_fail "Dup fd3 metadata" "Expected mode:replace and cursor:5, Got: $metadata"
+    fi
+}
+
+# Path action tests
+test_path_script_exists() {
+    if [[ -x "$PLUGIN_DIR/actions/path.sh" ]]; then
+        test_pass "Path script exists and executable"
+    else
+        test_fail "Path script missing or not executable"
+    fi
+}
+
 # Wrap action tests - test wrapping logic directly
 test_wrap_double_quote() {
     local result
@@ -2589,6 +2668,15 @@ run_test test_move_swap_first_last
 run_test test_move_swap_adjacent
 run_test test_move_script_exists
 run_test test_move_exits_on_single_token
+
+# Dup action tests
+run_test test_dup_basic
+run_test test_dup_last_token
+run_test test_dup_first_token
+run_test test_dup_fd3_metadata
+
+# Path action tests
+run_test test_path_script_exists
 
 # Wrap action tests
 run_test test_wrap_double_quote
