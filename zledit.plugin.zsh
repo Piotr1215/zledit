@@ -167,6 +167,8 @@ _zledit_load_config() {
     zstyle -s ':zledit:' fzf-path-key val; Zledit[path-key]="${val:-ctrl-p}"
     zstyle -s ':zledit:' fzf-instant-key val; Zledit[instant-key]="${val:-;}"
     zstyle -s ':zledit:' debug val; Zledit[debug]="${val:-off}"
+    zstyle -s ':zledit:' batch-apply val; Zledit[batch-apply]="${val:-on}"
+    zstyle -s ':zledit:' fzf-single-key val; Zledit[single-key]="${val:-alt-1}"
 
     # Extensibility config - unified or separate files
     zstyle -s ':zledit:' config val
@@ -410,6 +412,149 @@ _zledit_tokenize() {
     fi
 }
 
+# ------------------------------------------------------------------------------
+# Batch-apply helpers
+# ------------------------------------------------------------------------------
+
+_zledit_token_counts() {
+    emulate -L zsh
+    typeset -gA _ze_token_counts
+    _ze_token_counts=()
+    local w
+    for w in "${_ze_words[@]}"; do
+        (( _ze_token_counts[$w] = ${_ze_token_counts[$w]:-0} + 1 ))
+    done
+}
+
+_zledit_batch_replace() {
+    emulate -L zsh
+    local saved_buffer="$1" token_idx="$2"
+    REPLY=0
+
+    local _dbg="${Zledit[debug]}"
+    if [[ "$_dbg" == "on" ]]; then
+        print "batch: idx=$token_idx batch=${Zledit[batch-apply]} single=$_ze_single_mode" >> /tmp/zledit-debug.log
+    fi
+
+    if [[ "${Zledit[batch-apply]}" != "on" ]]; then
+        [[ "$_dbg" == "on" ]] && print "batch: SKIP batch-apply off" >> /tmp/zledit-debug.log
+        return 0
+    fi
+    if (( _ze_single_mode )); then
+        [[ "$_dbg" == "on" ]] && print "batch: SKIP single mode" >> /tmp/zledit-debug.log
+        return 0
+    fi
+
+    # Normalize: $() in _zledit_do_custom_action strips trailing newlines
+    while [[ "$saved_buffer" == *$'\n' ]]; do saved_buffer="${saved_buffer%$'\n'}"; done
+
+    local token="${_ze_words[$token_idx]}"
+    local count="${_ze_token_counts[$token]}"
+    if [[ "$_dbg" == "on" ]]; then
+        print "batch: token='$token' count=$count words=${#_ze_words[@]}" >> /tmp/zledit-debug.log
+    fi
+    if (( count <= 1 )); then
+        [[ "$_dbg" == "on" ]] && print "batch: SKIP count<=1" >> /tmp/zledit-debug.log
+        return 0
+    fi
+
+    local orig_pos="${_ze_positions[$token_idx]}"
+    if (( orig_pos > 0 )); then
+        if [[ "${saved_buffer:0:$orig_pos}" != "${BUFFER:0:$orig_pos}" ]]; then
+            if [[ "$_dbg" == "on" ]]; then
+                print "batch: prefix old='${saved_buffer:0:$orig_pos}' new='${BUFFER:0:$orig_pos}'" >> /tmp/zledit-debug.log
+                print "batch: SKIP prefix mismatch" >> /tmp/zledit-debug.log
+            fi
+            return 0
+        fi
+    fi
+    [[ "$_dbg" == "on" ]] && print "batch: prefix old='${saved_buffer:0:$orig_pos}' new='${BUFFER:0:$orig_pos}'" >> /tmp/zledit-debug.log
+
+    local orig_len=${#token}
+    local old_end=$((orig_pos + orig_len))
+    local saved_tail="${saved_buffer:$old_end}"
+    local buf_len=${#BUFFER}
+    local tail_len=${#saved_tail}
+    local new_tail_start=$((buf_len - tail_len))
+
+    if [[ "${BUFFER:$new_tail_start}" != "$saved_tail" ]]; then
+        if [[ "$_dbg" == "on" ]]; then
+            print "batch: tail saved='$saved_tail' actual='${BUFFER:$new_tail_start}'" >> /tmp/zledit-debug.log
+            print "batch: SKIP tail mismatch" >> /tmp/zledit-debug.log
+        fi
+        return 0
+    fi
+    [[ "$_dbg" == "on" ]] && print "batch: tail saved='$saved_tail' actual='${BUFFER:$new_tail_start}'" >> /tmp/zledit-debug.log
+
+    local replacement="${BUFFER:$orig_pos:$((new_tail_start - orig_pos))}"
+    [[ "$replacement" == "$token" ]] && return 0
+
+    [[ "$_dbg" == "on" ]] && print "batch: replacement='$replacement'" >> /tmp/zledit-debug.log
+
+    local -a other_positions=()
+    local i
+    for i in {1..${#_ze_words[@]}}; do
+        (( i == token_idx )) && continue
+        [[ "${_ze_words[$i]}" == "$token" ]] || continue
+        other_positions+=("${_ze_positions[$i]}")
+    done
+    (( ${#other_positions[@]} == 0 )) && return 0
+
+    [[ "$_dbg" == "on" ]] && print "batch: other_positions=(${other_positions[*]})" >> /tmp/zledit-debug.log
+
+    local -a sorted=(${(On)other_positions})
+    local delta=$(( ${#replacement} - orig_len ))
+    local pos adj_pos replaced=0
+    for pos in "${sorted[@]}"; do
+        if (( pos > orig_pos )); then
+            adj_pos=$((pos + delta))
+        else
+            adj_pos=$pos
+        fi
+        BUFFER="${BUFFER:0:$adj_pos}${replacement}${BUFFER:$((adj_pos + orig_len))}"
+        (( replaced++ ))
+    done
+
+    [[ "$_dbg" == "on" ]] && print "batch: replaced=$replaced BUFFER='$BUFFER'" >> /tmp/zledit-debug.log
+
+    REPLY=$replaced
+}
+
+_zledit_binding_to_byte() {
+    emulate -L zsh
+    local binding="$1"
+    REPLY=""
+
+    if [[ "$binding" == ctrl-* ]]; then
+        local ch="${binding#ctrl-}"
+        local ord=$(( #ch ))
+        local ctrl_ord=$(( ord - 96 ))
+        REPLY=$(printf '\x'"$(printf '%02x' $ctrl_ord)")
+    elif [[ "$binding" == alt-* ]]; then
+        local ch="${binding#alt-}"
+        REPLY=$'\e'"$ch"
+    else
+        REPLY="$binding"
+    fi
+}
+
+_zledit_find_action_by_key() {
+    emulate -L zsh
+    local key="$1"
+    REPLY=0
+
+    local i binding_bytes
+    for i in {1..${#_ze_action_bindings[@]}}; do
+        _zledit_binding_to_byte "${_ze_action_bindings[$i]}"
+        binding_bytes="$REPLY"
+        if [[ "$key" == "$binding_bytes" ]]; then
+            REPLY=$i
+            return 0
+        fi
+    done
+    REPLY=0
+}
+
 # Build preview command
 # Returns preview command string via REPLY
 _zledit_build_preview_cmd() {
@@ -447,12 +592,18 @@ zledit-widget() {
 
     _zledit_tokenize
     [[ ${#_ze_words[@]} -eq 0 ]] && return 0
+    _zledit_token_counts
 
     # Build numbered list for fzf (letters shown via overlay after instant-key)
     local -a numbered
     local i
     for i in {1..${#_ze_words[@]}}; do
-        numbered+=("$i: ${_ze_words[$i]}")
+        local _w="${_ze_words[$i]}" _cnt="${_ze_token_counts[${_ze_words[$i]}]}"
+        if (( _cnt > 1 )); then
+            numbered+=("$i: ${_w} (x${_cnt})")
+        else
+            numbered+=("$i: ${_w}")
+        fi
     done
 
     # Use pre-loaded config from Zledit array (no zstyle reads during widget)
@@ -474,6 +625,7 @@ zledit-widget() {
             header_parts+=("${key_display}:${desc}")
         done
         header_parts+=("${ik}+a-z:jump")
+        [[ "${Zledit[batch-apply]}" == "on" ]] && header_parts+=("M-1:single")
         header="${(j: | :)header_parts}"
 
         # Build hint key bindings and unbind/rebind lists
@@ -499,6 +651,9 @@ zledit-widget() {
         binds+=",${ik}:rebind($rebinds)"
         # Preview scroll
         binds+=",ctrl-d:preview-page-down,ctrl-u:preview-page-up"
+        # Single-mode escape hatch for batch-apply
+        [[ "${Zledit[batch-apply]}" == "on" ]] && \
+            binds+=",${Zledit[single-key]}:print(single)+accept"
 
         if [[ "${Zledit[preview]}" != "off" ]]; then
             _zledit_build_preview_cmd
@@ -545,15 +700,113 @@ zledit-widget() {
     # Handle result based on action key
     local -a selections=("${(@f)_ze_result_selection}")
 
+    local _raw_sel="${selections[1]}"
+    _raw_sel="${_raw_sel% (x[0-9]*)}"
+
+    typeset -g _ze_single_mode=0
+    typeset -g _ze_deferred=0
+    typeset -g _ze_deferred_prefix=""
+
     case "$_ze_result_key" in
+        single)
+            _ze_single_mode=1
+            local -a _act_list=()
+            local _ai
+            for _ai in {1..${#_ze_action_bindings[@]}}; do
+                _act_list+=("${_ai}: ${_ze_action_descriptions[$_ai]}")
+            done
+            zle -I
+            local _act_sel
+            if [[ "$picker" == "fzf-tmux" ]]; then
+                _act_sel=$(printf '%s\n' "${_act_list[@]}" | fzf-tmux --reverse --prompt="action> ") || true
+            else
+                _act_sel=$(printf '%s\n' "${_act_list[@]}" | fzf --height=10 --reverse --prompt="action> ") || true
+            fi
+            if [[ -n "$_act_sel" ]]; then
+                local _act_idx="${_act_sel%%:*}"
+                _zledit_do_custom_action "$_act_idx" "$_raw_sel"
+            fi
+            ;;
         action-*)
             # All actions (built-in and custom) use external scripts
             local action_idx="${_ze_result_key#action-}"
-            _zledit_do_custom_action "$action_idx" "${selections[@]}"
+            local _batch_saved="$BUFFER"
+            local _batch_tidx="$(_zledit_extract_index "$_raw_sel")"
+            _zledit_do_custom_action "$action_idx" "$_raw_sel"
+            if (( _ze_deferred )); then
+                # Deferred replacement: in-context recursive-edit with tab completion
+                local _target="${_ze_words[$_batch_tidx]}"
+                local _tpos="${_ze_positions[$_batch_tidx]}"
+                local _prefix="$_ze_deferred_prefix"
+                local _count=0 _i
+                for _i in {1..${#_ze_words[@]}}; do
+                    [[ "${_ze_words[$_i]}" == "$_target" ]] && (( _count++ ))
+                done
+                # Delete target (or just value part if prefix set) from BUFFER at selected position
+                local _del_start _del_len
+                if [[ -n "$_prefix" ]]; then
+                    _del_start=$(( _tpos + ${#_prefix} ))
+                    _del_len=$(( ${#_target} - ${#_prefix} ))
+                else
+                    _del_start=$_tpos
+                    _del_len=${#_target}
+                fi
+                local _buf_after_delete="${BUFFER:0:$_del_start}${BUFFER:$((_del_start + _del_len))}"
+                BUFFER="$_buf_after_delete"
+                CURSOR=$_del_start
+                zle reset-prompt
+                if (( _count > 1 )); then
+                    zle -M "replace '$_target' (x${_count}) → Enter to apply, Ctrl-G cancel"
+                else
+                    zle -M "replace '$_target' → Enter to apply, Ctrl-G cancel"
+                fi
+                zle recursive-edit
+                local _ret=$?
+                if (( _ret == 0 )); then
+                    if (( _count > 1 )); then
+                        # Extract what user typed at the deletion point
+                        local _typed_len=$(( ${#BUFFER} - ${#_buf_after_delete} ))
+                        local _typed_text="${BUFFER:$_del_start:$((_typed_len > 0 ? _typed_len : 0))}"
+                        # Build full replacement (prefix + typed text)
+                        local _replacement
+                        if [[ -n "$_prefix" ]]; then
+                            _replacement="${_prefix}${_typed_text}"
+                        else
+                            _replacement="$_typed_text"
+                        fi
+                        # Restore and replace ALL occurrences right-to-left
+                        BUFFER="$_batch_saved"
+                        local -a _all_pos=()
+                        for _i in {1..${#_ze_words[@]}}; do
+                            [[ "${_ze_words[$_i]}" == "$_target" ]] || continue
+                            _all_pos+=("${_ze_positions[$_i]}")
+                        done
+                        local -a _sorted=(${(On)_all_pos})
+                        local _p
+                        for _p in "${_sorted[@]}"; do
+                            BUFFER="${BUFFER:0:$_p}${_replacement}${BUFFER:$((_p + ${#_target}))}"
+                        done
+                        # Cursor on last (rightmost) replaced element
+                        local _delta=$(( ${#_replacement} - ${#_target} ))
+                        CURSOR=$(( _sorted[1] + (${#_all_pos[@]} - 1) * _delta ))
+                        zle -M "zledit: replaced '$_target' (x${_count})"
+                    fi
+                    # Single occurrence: BUFFER already has the final result
+                else
+                    BUFFER="$_batch_saved"
+                fi
+            else
+                # Batch-apply to identical tokens
+                _zledit_batch_replace "$_batch_saved" "$_batch_tidx"
+                if (( REPLY > 0 )); then
+                    local _bw="${_ze_words[$_batch_tidx]}"
+                    zle -M "zledit: ${_ze_action_descriptions[$action_idx]} ${_bw} (x$((REPLY + 1)))"
+                fi
+            fi
             ;;
         *)
             # Default: jump to selection
-            _zledit_do_jump "${selections[@]}"
+            _zledit_do_jump "$_raw_sel"
             ;;
     esac
 
@@ -657,7 +910,7 @@ _zledit_do_custom_action() {
     local meta_out=$(<"$meta_file"); rm -f "$meta_file"
 
     # Parse fd 3 metadata if present
-    local meta_mode="" meta_cursor="" meta_pushline="" meta_message=""
+    local meta_mode="" meta_cursor="" meta_pushline="" meta_message="" meta_prefix=""
     if [[ -n "$meta_out" ]]; then
         local line
         while IFS= read -r line; do
@@ -666,6 +919,7 @@ _zledit_do_custom_action() {
                 cursor:*)   meta_cursor="${line#cursor:}" ;;
                 pushline:*) meta_pushline="${line#pushline:}" ;;
                 message:*)  meta_message="${line#message:}" ;;
+                prefix:*)   meta_prefix="${line#prefix:}" ;;
             esac
         done <<< "$meta_out"
     fi
@@ -706,6 +960,11 @@ _zledit_do_custom_action() {
             error)
                 zle -M "zledit: ${meta_message:-action failed}"
                 return 1
+                ;;
+            deferred)
+                typeset -g _ze_deferred=1
+                typeset -g _ze_deferred_prefix="$meta_prefix"
+                return 0
                 ;;
         esac
         return 0
@@ -834,13 +1093,16 @@ zledit-unload() {
                _zledit_build_overlay _zledit_hint_to_index \
                _zledit_highlight_hints _zledit_build_preview_cmd \
                _zledit_parse_toml _zledit_save_toml_item \
+               _zledit_token_counts _zledit_batch_replace \
+               _zledit_binding_to_byte _zledit_find_action_by_key \
                zledit-setup-bindings zledit-list zledit-unload 2>/dev/null
 
     unset '_ze_words' '_ze_positions' '_ze_result_key' '_ze_result_selection' \
           '_ze_invoke_prompt' '_ze_invoke_header' '_ze_invoke_binds' \
           '_ze_invoke_preview_args' '_ze_hint_keys' \
           '_ze_previewer_patterns' '_ze_previewer_descriptions' '_ze_previewer_scripts' \
-          '_ze_action_bindings' '_ze_action_descriptions' '_ze_action_scripts'
+          '_ze_action_bindings' '_ze_action_descriptions' '_ze_action_scripts' \
+          '_ze_token_counts' '_ze_single_mode' '_ze_deferred' '_ze_deferred_prefix'
     unset Zledit
 
     return 0

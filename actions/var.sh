@@ -29,9 +29,22 @@ base="${base%\'}"      # Strip trailing '
 # Generate variable name (uppercase, replace non-alphanumeric with _)
 var_name=$(echo "$base" | tr '[:lower:]' '[:upper:]' | sed 's/[^A-Z0-9]/_/g')
 
-# Calculate replacement - put variable reference in place of token
-end_pos=$((pos + ${#TOKEN}))
-new_buffer="${ZJ_BUFFER:0:$pos}\"\$${var_name}\"${ZJ_BUFFER:$end_pos}"
+# Replace ALL occurrences right-to-left (pushline mode bypasses batch-apply)
+IFS=$'\n' read -r -d '' -a words <<< "$ZJ_WORDS" || true
+ref="\"\$${var_name}\""
+new_buffer="$ZJ_BUFFER"
+
+# Collect all positions of this token, sort descending
+all_pos=()
+for i in "${!words[@]}"; do
+    [[ "${words[$i]}" == "$TOKEN" ]] && all_pos+=("${positions[$i]}")
+done
+IFS=$'\n' sorted=($(printf '%s\n' "${all_pos[@]}" | sort -rn)); unset IFS
+
+for p in "${sorted[@]}"; do
+    end_pos=$((p + ${#TOKEN}))
+    new_buffer="${new_buffer:0:$p}${ref}${new_buffer:$end_pos}"
+done
 
 # For the assignment, use the original base value (unquoted content)
 # Escape double quotes in base for assignment

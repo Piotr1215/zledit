@@ -31,7 +31,7 @@ The tokenizer, position tracking, and buffer manipulation are pure zsh - no exte
 **Layers:**
 
 1. **Tokenizer** - Pure zsh. Parses BUFFER, produces parallel arrays
-2. **Actions** - Pure zsh. Jump, wrap, help, var, replace
+2. **Actions** - Pure zsh. Jump, wrap, help, var, replace, batch-apply
 3. **Picker Adapters** - Ports & adapters pattern. Same interface, different backends
 4. **Widget** - Orchestration. Overlay hints, instant mode, glues layers together
 
@@ -189,10 +189,11 @@ _zledit_do_jump() {
 
 Tests covering:
 
-1. **Unit tests** - Tokenizer in isolation
-2. **Edge cases** - Unicode, special chars, long strings
-3. **Integration** - Full widget behavior
-4. **Regression** - Specific bugs (e.g., `--` in commands)
+1. **Unit tests** - Tokenizer, batch-replace, binding conversion in isolation
+2. **Edge cases** - Unicode, special chars, long strings, trailing newlines
+3. **Integration** - Full widget behavior, action scripts
+4. **Regression** - Specific bugs (e.g., `--` in commands, `$()` newline stripping)
+5. **Performance** - Load time (<200ms), tokenize 100x (<150ms), memory leak detection (<400KB)
 
 Tests run in isolated zsh subshells:
 ```zsh
@@ -226,6 +227,8 @@ Where we deliberately do nothing:
 | Empty BUFFER | Early return | Nothing to jump to |
 | Index out of bounds | Return 1, no-op | Guard in every action |
 | Picker cancelled | Redisplay, no-op | User intent is clear |
+| Action rearranges buffer | Batch skipped | Prefix/tail guards detect structural changes |
+| `$()` strips trailing newlines | Normalized before comparison | Known shell behavior |
 
 Invariants the widget relies on:
 - BUFFER is stable during widget execution
@@ -329,9 +332,11 @@ fi
 | | `pushline` | Save buffer, show `pushline:` command for user to execute |
 | | `pushline-exec` | Save buffer, execute `pushline:` command immediately |
 | | `error` | Show `message:` as error, abort |
+| | `deferred` | In-context editing via `zle recursive-edit` (preserves tab completion) |
 | `cursor` | `N` | Set cursor to position N |
 | `pushline` | `cmd` | Command to show/execute (for pushline modes) |
 | `message` | `text` | Error message (for error mode) |
+| `prefix` | `text` | With `deferred`: keep prefix intact, edit only the value part (e.g., `prefix:VAR=` edits after `=`) |
 
 **Legacy Exit Codes:**
 
@@ -381,6 +386,36 @@ fi
 ```
 
 See `examples/` for more sample scripts.
+
+## Batch-Apply
+
+When identical tokens appear multiple times (e.g., `sre-haiku` in a multiline kubectl command), actions apply to all occurrences by default.
+
+### Algorithm
+
+After an action modifies BUFFER at the selected token's position:
+
+1. Strip trailing newlines from saved buffer (command substitution in action scripts eats them)
+2. Verify prefix (before token) unchanged - catches move/swap actions
+3. Verify tail (after token) unchanged - catches rearrangements
+4. Extract replacement text by diffing old and new buffer at the known position
+5. Find all other positions with identical token text
+6. Sort positions descending, apply replacements right-to-left
+
+Right-to-left avoids cascading offset adjustments. Positions after the first replacement shift by `delta = len(replacement) - len(original)`, positions before don't shift.
+
+### Safety Guards
+
+| Guard | What it catches |
+|-------|----------------|
+| Prefix mismatch | Action modified buffer before the token (move/swap) |
+| Tail mismatch | Action rearranged the buffer structure |
+| Trailing newline normalization | `$()` strips trailing newlines from action script output |
+| `_ze_single_mode` | User explicitly chose single-token mode via Alt+1 |
+
+### Single Mode
+
+Alt+1 exits fzf, shows a second picker listing available actions. The selected action runs with `_ze_single_mode=1`, which `_zledit_batch_replace` checks and skips.
 
 ## Future Considerations
 
