@@ -47,6 +47,9 @@ skip_test() {
     print -- "- Skipping: $1"
 }
 
+# Alias used in inline skip guards
+test_skip() { skip_test "$@"; }
+
 # ------------------------------------------------------------------------------
 # Tests
 # ------------------------------------------------------------------------------
@@ -2856,6 +2859,258 @@ test_unload_cleans_batch() {
 }
 
 # ------------------------------------------------------------------------------
+# Config permutation tests
+# ------------------------------------------------------------------------------
+
+test_config_overlay_off() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" overlay off
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[overlay]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "off" ]]; then
+        test_pass "Config: overlay=off respected"
+    else
+        test_fail "Config overlay off" "Expected: off, Got: $result"
+    fi
+}
+
+test_config_preview_off() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" preview off
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[preview]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "off" ]]; then
+        test_pass "Config: preview=off respected"
+    else
+        test_fail "Config preview off" "Expected: off, Got: $result"
+    fi
+}
+
+test_config_debug_on() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" debug on
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[debug]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "on" ]]; then
+        test_pass "Config: debug=on respected"
+    else
+        test_fail "Config debug on" "Expected: on, Got: $result"
+    fi
+}
+
+test_config_custom_action_keys() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" fzf-wrap-key ctrl-w
+        zstyle ":zledit:" fzf-var-key ctrl-v
+        zstyle ":zledit:" fzf-replace-key ctrl-x
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[wrap-key]}|${Zledit[var-key]}|${Zledit[replace-key]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "ctrl-w|ctrl-v|ctrl-x" ]]; then
+        test_pass "Config: custom action keys respected"
+    else
+        test_fail "Config action keys" "Expected: ctrl-w|ctrl-v|ctrl-x, Got: $result"
+    fi
+}
+
+test_config_custom_binding() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" binding "^[j"
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        bindkey "^[j" 2>&1 | grep -c zledit
+    ' 2>/dev/null)
+    if [[ "$result" == "1" ]]; then
+        test_pass "Config: custom binding key works"
+    else
+        test_fail "Config custom binding" "Expected: 1 match, Got: $result"
+    fi
+}
+
+test_config_preview_window_custom() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" preview-window "bottom:40%"
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[preview-window]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "bottom:40%" ]]; then
+        test_pass "Config: custom preview-window"
+    else
+        test_fail "Config preview-window" "Expected: bottom:40%, Got: $result"
+    fi
+}
+
+test_config_cursor_end() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" cursor end
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[cursor]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "end" ]]; then
+        test_pass "Config: cursor=end respected"
+    else
+        test_fail "Config cursor end" "Expected: end, Got: $result"
+    fi
+}
+
+test_config_defaults_consistent() {
+    # Verify all defaults are set and non-conflicting
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        local keys=("${Zledit[wrap-key]}" "${Zledit[var-key]}" "${Zledit[replace-key]}" "${Zledit[move-key]}" "${Zledit[dup-key]}" "${Zledit[path-key]}")
+        # Check no empty defaults
+        for k in "${keys[@]}"; do [[ -z "$k" ]] && { echo "empty"; exit 1; }; done
+        # Check no duplicates
+        local -A seen
+        for k in "${keys[@]}"; do
+            [[ -n "${seen[$k]}" ]] && { echo "dup:$k"; exit 1; }
+            seen[$k]=1
+        done
+        echo "ok"
+    ' 2>/dev/null)
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Config: all default action keys unique and non-empty"
+    else
+        test_fail "Config defaults consistency" "$result"
+    fi
+}
+
+test_config_picker_opts_passthrough() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" picker-opts "--height=20 --reverse"
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[picker-opts]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "--height=20 --reverse" ]]; then
+        test_pass "Config: picker-opts passthrough"
+    else
+        test_fail "Config picker-opts" "Expected: --height=20 --reverse, Got: $result"
+    fi
+}
+
+test_config_batch_and_single_independent() {
+    # batch-apply=off should not affect single-key setting
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" batch-apply off
+        zstyle ":zledit:" fzf-single-key alt-2
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[batch-apply]}|${Zledit[single-key]}"
+    ' 2>/dev/null)
+    if [[ "$result" == "off|alt-2" ]]; then
+        test_pass "Config: batch-apply and single-key independent"
+    else
+        test_fail "Config batch/single independence" "Expected: off|alt-2, Got: $result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Environment constraint tests
+# ------------------------------------------------------------------------------
+
+test_version_compare_modern() {
+    # Test version comparison logic directly (no fzf binary needed)
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        # Override to test comparison with modern version
+        fzf() { echo "0.55.0"; }
+        _zledit_check_fzf_version && echo "pass" || echo "fail"
+    ' 2>/dev/null)
+    if [[ "$result" == "pass" ]]; then
+        test_pass "Version compare: 0.55.0 >= 0.53.0"
+    else
+        test_fail "Version compare modern" "Expected: pass, Got: $result"
+    fi
+}
+
+test_version_compare_old() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        fzf() { echo "0.44.1"; }
+        _zledit_check_fzf_version && echo "pass" || echo "reject"
+    ' 2>/dev/null)
+    if [[ "$result" == "reject" ]]; then
+        test_pass "Version compare: 0.44.1 < 0.53.0 rejected"
+    else
+        test_fail "Version compare old" "Expected: reject, Got: $result"
+    fi
+}
+
+test_version_compare_boundary() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        fzf() { echo "0.53.0"; }
+        _zledit_check_fzf_version && echo "pass" || echo "fail"
+    ' 2>/dev/null)
+    if [[ "$result" == "pass" ]]; then
+        test_pass "Version compare: exact 0.53.0 accepted"
+    else
+        test_fail "Version compare boundary" "Expected: pass, Got: $result"
+    fi
+}
+
+test_old_fzf_clears_picker() {
+    command -v fzf &>/dev/null || { test_skip "fzf not installed"; return; }
+    local result
+    result=$(zsh -c '
+        # Wrap real fzf to report old version
+        real_fzf=$(command -v fzf)
+        fzf() { [[ "$1" == "--version" ]] && echo "0.44.1" || "$real_fzf" "$@"; }
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[picker]:-cleared}"
+    ' 2>/dev/null)
+    if [[ "$result" == "cleared" ]]; then
+        test_pass "Old fzf clears picker (graceful degradation)"
+    else
+        test_fail "Old fzf picker clear" "Expected: cleared, Got: $result"
+    fi
+}
+
+test_no_picker_graceful() {
+    local result
+    result=$(zsh -c '
+        PATH=/usr/bin:/bin
+        hash -r
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        echo "${Zledit[picker]:-none}"
+    ' 2>/dev/null)
+    if [[ "$result" == "none" ]]; then
+        test_pass "No picker: graceful empty state"
+    else
+        test_fail "No picker handling" "Expected: none, Got: $result"
+    fi
+}
+
+test_plugin_loads_without_picker() {
+    local result
+    result=$(zsh -c '
+        PATH=/usr/bin:/bin
+        hash -r
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        (( $+functions[_zledit_tokenize] )) && echo "ok" || echo "fail"
+    ' 2>/dev/null)
+    if [[ "$result" == "ok" ]]; then
+        test_pass "Core functions available without picker"
+    else
+        test_fail "Functions missing without picker" "$result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Performance tests (with thresholds)
 # ------------------------------------------------------------------------------
 
@@ -3097,6 +3352,26 @@ run_test test_find_action_by_key
 run_test test_batch_no_duplicates_noop
 run_test test_batch_functions_defined
 run_test test_unload_cleans_batch
+
+# Config permutation tests
+run_test test_config_overlay_off
+run_test test_config_preview_off
+run_test test_config_debug_on
+run_test test_config_custom_action_keys
+run_test test_config_custom_binding
+run_test test_config_preview_window_custom
+run_test test_config_cursor_end
+run_test test_config_defaults_consistent
+run_test test_config_picker_opts_passthrough
+run_test test_config_batch_and_single_independent
+
+# Environment constraint tests
+run_test test_version_compare_modern
+run_test test_version_compare_old
+run_test test_version_compare_boundary
+run_test test_old_fzf_clears_picker
+run_test test_no_picker_graceful
+run_test test_plugin_loads_without_picker
 
 # Performance tests
 run_test test_perf_load_time
