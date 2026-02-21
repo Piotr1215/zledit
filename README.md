@@ -46,6 +46,7 @@ Press `;` to enter **instant mode**: press a letter key (a, s, d...) to jump dir
 - **Wrap/Surround**: Wrap tokens in quotes, brackets, or command substitution
 - **Move/Swap**: Swap token positions via secondary picker
 - **Variable extraction**: Convert tokens to shell variables
+- **Batch-apply**: Actions apply to all identical tokens at once
 - **Smart preview**: Command help (`--help`/`tldr`/`man`), file contents, directory listings
 
 ## Requirements
@@ -142,15 +143,18 @@ With FZF, additional actions available via key combos (shown in header):
 | `Enter` | Jump to selected token |
 | `Ctrl+S` | Wrap token in `"..."`, `'...'`, `$(...)`, etc. |
 | `Ctrl+E` | Extract token to `UPPERCASE` variable (uses push-line) |
-| `Ctrl+R` | Replace token (delete and position cursor for typing) |
+| `Ctrl+R` | Replace token (prompts with tab completion, batch-applies) |
 | `Ctrl+M` | Move/swap token with another position |
+| `Alt+1` | Single mode: apply next action to selected token only (skip batch) |
 | `;` | Enter instant mode (then press a-z to jump) |
 
-**Tip**: `Ctrl+R` deletes the token and leaves cursor in place - you get full zsh tab completion for the replacement text.
+**Tip**: `Ctrl+R` pre-fills the token for editing with full zsh tab completion. Press Enter to apply the replacement to all identical tokens. Press `Ctrl-G` to cancel.
 
 **Instant mode**: Press `;` while in the picker, then press a hint letter (a, s, d, f...) to jump directly to that word. The overlay on your command line shows which letter maps to which word.
 
 Variable extraction converts `my-gpu` to `MY_GPU="my-gpu"` and `"$MY_GPU"` in the command. Special characters become underscores.
+
+**Batch mode**: When identical tokens appear multiple times, actions apply to all occurrences automatically. The picker shows duplicate counts like `(x2)` next to repeated tokens. Press `Alt+1` to apply to only the selected occurrence.
 
 **Complex edits**: For heavy multiline editing, `Ctrl+X Ctrl+E` (edit in `$EDITOR`) still shines. zledit is for quick navigation and token manipulation.
 
@@ -206,6 +210,10 @@ zstyle ':zledit:' fzf-var-key 'ctrl-e'
 zstyle ':zledit:' fzf-replace-key 'ctrl-r'
 zstyle ':zledit:' fzf-move-key 'ctrl-m'
 zstyle ':zledit:' fzf-instant-key ';'
+zstyle ':zledit:' fzf-single-key 'alt-1'  # single-mode key (skip batch)
+
+# Batch-apply: actions apply to all identical tokens (default: on)
+zstyle ':zledit:' batch-apply off          # disable batch mode
 
 # Vi mode: bind to both insert and command modes
 zstyle ':zledit:' disable-bindings yes

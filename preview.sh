@@ -4,6 +4,7 @@ set -eo pipefail
 
 TOKEN="$1"
 TOKEN="${TOKEN#*: }"  # Strip "N: " prefix
+TOKEN="${TOKEN% (x[0-9]*)}"  # Strip batch count suffix "(x2)" etc.
 export TOKEN
 
 # Check custom previewers first (user overrides)

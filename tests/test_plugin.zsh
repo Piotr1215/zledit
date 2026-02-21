@@ -1302,54 +1302,51 @@ test_var_escapes_quotes() {
     fi
 }
 
-test_replace_deletes_whole_token() {
-    # Test external replace action script
-    local result buffer
-    result=$(
+test_replace_signals_deferred() {
+    local meta_file=$(mktemp)
+    (
         export ZJ_BUFFER="echo --flag-long-!123 bar"
         export ZJ_POSITIONS=$'0\n5\n22'
-        "$PLUGIN_DIR/actions/replace.sh" "--flag-long-!123" "2" 2>&1
+        exec 3>"$meta_file"
+        "$PLUGIN_DIR/actions/replace.sh" "--flag-long-!123" "2" 2>/dev/null
+        exec 3>&-
     )
-    buffer="${result%$'\n'}"  # Strip trailing newline
+    local metadata=$(<"$meta_file"); rm -f "$meta_file"
 
-    if [[ "$buffer" == "echo  bar" ]]; then
-        test_pass "Replace deletes whole token"
+    if [[ "$metadata" == *"mode:deferred"* ]]; then
+        test_pass "Replace signals mode:deferred via fd3"
     else
-        test_fail "Replace failed" "Expected: 'echo  bar', Got: '$buffer'"
+        test_fail "Replace failed" "Expected mode:deferred, Got: '$metadata'"
     fi
 }
 
-test_replace_first_word() {
-    # Test external replace action script
-    local result buffer
+test_replace_no_stdout() {
+    local result
     result=$(
         export ZJ_BUFFER="kubectl get pods"
         export ZJ_POSITIONS=$'0\n8\n12'
-        "$PLUGIN_DIR/actions/replace.sh" "kubectl" "1" 2>&1
+        "$PLUGIN_DIR/actions/replace.sh" "kubectl" "1" 3>/dev/null 2>/dev/null
     )
-    buffer="${result%$'\n'}"  # Strip trailing newline
 
-    if [[ "$buffer" == " get pods" ]]; then
-        test_pass "Replace first word"
+    if [[ -z "$result" ]]; then
+        test_pass "Replace produces no stdout (deferred mode)"
     else
-        test_fail "Replace first word failed" "Expected: ' get pods', Got: '$buffer'"
+        test_fail "Replace no stdout" "Expected empty, Got: '$result'"
     fi
 }
 
-test_replace_last_word() {
-    # Test external replace action script
-    local result buffer
-    result=$(
+test_replace_exits_zero() {
+    (
         export ZJ_BUFFER="git commit -m"
         export ZJ_POSITIONS=$'0\n4\n11'
-        "$PLUGIN_DIR/actions/replace.sh" "-m" "3" 2>&1
+        "$PLUGIN_DIR/actions/replace.sh" "-m" "3" 3>/dev/null 2>/dev/null
     )
-    buffer="${result%$'\n'}"  # Strip trailing newline
+    local exit_code=$?
 
-    if [[ "$buffer" == "git commit " ]]; then
-        test_pass "Replace last word"
+    if (( exit_code == 0 )); then
+        test_pass "Replace exits 0 in deferred mode"
     else
-        test_fail "Replace last word failed" "Expected: 'git commit ', Got: '$buffer'"
+        test_fail "Replace exit code" "Expected 0, Got: $exit_code"
     fi
 }
 
@@ -2509,6 +2506,356 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
+# Batch-apply tests
+# ------------------------------------------------------------------------------
+
+test_batch_apply_config_default() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[batch-apply]}\"
+    " 2>&1)
+    if [[ "$result" == "on" ]]; then
+        test_pass "Batch-apply defaults to on"
+    else
+        test_fail "Batch-apply default" "Expected: on, Got: $result"
+    fi
+}
+
+test_single_key_config_default() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        echo \"\${Zledit[single-key]}\"
+    " 2>&1)
+    if [[ "$result" == "alt-1" ]]; then
+        test_pass "Single-key defaults to alt-1"
+    else
+        test_fail "Single-key default" "Expected: alt-1, Got: $result"
+    fi
+}
+
+test_token_counts_basic() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="echo hello echo world"
+        _zledit_tokenize
+        _zledit_token_counts
+        echo "${_ze_token_counts[echo]}:${_ze_token_counts[hello]}:${_ze_token_counts[world]}"
+    ' 2>&1)
+    if [[ "$result" == "2:1:1" ]]; then
+        test_pass "Token counts correct"
+    else
+        test_fail "Token counts" "Expected: 2:1:1, Got: $result"
+    fi
+}
+
+test_duplicate_count_display() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        _ze_words=(echo hello echo world)
+        _ze_positions=(0 5 11 16)
+        _zledit_token_counts
+        local -a numbered
+        for i in {1..${#_ze_words[@]}}; do
+            local w="${_ze_words[$i]}"
+            local cnt="${_ze_token_counts[$w]}"
+            if (( cnt > 1 )); then
+                numbered+=("$i: $w (x$cnt)")
+            else
+                numbered+=("$i: $w")
+            fi
+        done
+        printf "%s\n" "${numbered[@]}"
+    ' 2>&1)
+    if [[ "$result" == *"1: echo (x2)"* ]] && [[ "$result" == *"2: hello"* ]] && \
+       [[ "$result" != *"2: hello (x"* ]] && [[ "$result" == *"3: echo (x2)"* ]]; then
+        test_pass "Duplicate count (xN) shown only for duplicates"
+    else
+        test_fail "Duplicate count display" "Got: $result"
+    fi
+}
+
+test_batch_replacement_basic() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="kubectl get sre-haiku -n sre-haiku"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=3  # first sre-haiku
+
+        # Simulate action: wrap sre-haiku in quotes at position 3
+        local pos="${_ze_positions[$token_idx]}"
+        local target="${_ze_words[$token_idx]}"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos}\"${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}\"${BUFFER:$pos}"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        echo "$BUFFER"
+    ' 2>&1)
+    if [[ "$result" == 'kubectl get "sre-haiku" -n "sre-haiku"' ]]; then
+        test_pass "Batch replacement applies to both identical tokens"
+    else
+        test_fail "Batch replacement basic" "Expected: kubectl get \"sre-haiku\" -n \"sre-haiku\", Got: $result"
+    fi
+}
+
+test_batch_replacement_different_lengths() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="echo foo bar foo"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=2  # first foo at position 5
+
+        # Simulate action: wrap foo -> $(foo) (longer replacement)
+        local pos="${_ze_positions[$token_idx]}"
+        local target="${_ze_words[$token_idx]}"
+        local end_pos=$((pos + ${#target}))
+        BUFFER="${BUFFER:0:$end_pos})${BUFFER:$end_pos}"
+        BUFFER="${BUFFER:0:$pos}\$(${BUFFER:$pos}"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        echo "$BUFFER"
+    ' 2>&1)
+    if [[ "$result" == 'echo $(foo) bar $(foo)' ]]; then
+        test_pass "Batch replacement with different lengths"
+    else
+        test_fail "Batch replacement different lengths" "Expected: echo \$(foo) bar \$(foo), Got: $result"
+    fi
+}
+
+test_batch_replacement_reverse_order() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="x a x a x"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=1  # first x at position 0
+
+        # Simulate action: wrap x -> "x"
+        BUFFER="\"x\" a x a x"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        echo "$BUFFER"
+    ' 2>&1)
+    if [[ "$result" == '"x" a "x" a "x"' ]]; then
+        test_pass "Batch replacement right-to-left order"
+    else
+        test_fail "Batch replacement reverse order" "Expected: \"x\" a \"x\" a \"x\", Got: $result"
+    fi
+}
+
+test_batch_trailing_newline() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="echo foo -n foo
+"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=2
+
+        # Simulate wrap action (trailing newline stripped by $())
+        BUFFER="echo \"foo\" -n foo"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        echo "$BUFFER"
+    ' 2>&1)
+    if [[ "$result" == 'echo "foo" -n "foo"' ]]; then
+        test_pass "Batch works despite trailing newline mismatch"
+    else
+        test_fail "Batch trailing newline" "Got: $result"
+    fi
+}
+
+test_batch_skip_when_prefix_changed() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="foo bar foo"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=1  # first foo at position 0
+
+        # Simulate a move-type action that changes prefix
+        BUFFER="bar foo foo"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        local count="$REPLY"
+        echo "buffer:$BUFFER|count:$count"
+    ' 2>&1)
+    if [[ "$result" == "buffer:bar foo foo|count:0" ]]; then
+        test_pass "Batch skips when prefix changed (safety guard)"
+    else
+        test_fail "Batch prefix safety" "Got: $result"
+    fi
+}
+
+test_single_mode_bypass() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="echo foo bar foo"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=2  # first foo
+
+        # Simulate wrap action
+        BUFFER="echo \"foo\" bar foo"
+
+        _ze_single_mode=1
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        local count="$REPLY"
+        echo "buffer:$BUFFER|count:$count"
+    ' 2>&1)
+    if [[ "$result" == 'buffer:echo "foo" bar foo|count:0' ]]; then
+        test_pass "Single mode bypasses batch"
+    else
+        test_fail "Single mode bypass" "Got: $result"
+    fi
+}
+
+test_batch_config_off() {
+    local result
+    result=$(zsh -c '
+        zstyle ":zledit:" batch-apply off
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="echo foo bar foo"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=2
+
+        BUFFER="echo \"foo\" bar foo"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        local count="$REPLY"
+        echo "buffer:$BUFFER|count:$count"
+    ' 2>&1)
+    if [[ "$result" == 'buffer:echo "foo" bar foo|count:0' ]]; then
+        test_pass "Batch-apply off prevents batch"
+    else
+        test_fail "Batch config off" "Got: $result"
+    fi
+}
+
+test_binding_to_byte_ctrl() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        _zledit_binding_to_byte "ctrl-s"
+        printf "%s" "$REPLY" | xxd -p
+    ' 2>&1)
+    if [[ "$result" == "13" ]]; then
+        test_pass "ctrl-s converts to byte 0x13"
+    else
+        test_fail "Binding to byte ctrl" "Expected: 13, Got: $result"
+    fi
+}
+
+test_binding_to_byte_alt() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        _zledit_binding_to_byte "alt-d"
+        printf "%s" "$REPLY" | xxd -p
+    ' 2>&1)
+    if [[ "$result" == "1b64" ]]; then
+        test_pass "alt-d converts to ESC+d (0x1b64)"
+    else
+        test_fail "Binding to byte alt" "Expected: 1b64, Got: $result"
+    fi
+}
+
+test_find_action_by_key() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        # Action bindings already loaded (ctrl-s=wrap, ctrl-e=var, etc.)
+        _zledit_binding_to_byte "${_ze_action_bindings[1]}"
+        local key="$REPLY"
+        _zledit_find_action_by_key "$key"
+        echo "$REPLY"
+    ' 2>&1)
+    if [[ "$result" == "1" ]]; then
+        test_pass "Find action by key matches first action"
+    else
+        test_fail "Find action by key" "Expected: 1, Got: $result"
+    fi
+}
+
+test_batch_no_duplicates_noop() {
+    local result
+    result=$(zsh -c '
+        source '"$PLUGIN_DIR"'/zledit.plugin.zsh
+        BUFFER="kubectl get pods"
+        _zledit_tokenize
+        _zledit_token_counts
+        local saved_buffer="$BUFFER"
+        local token_idx=1
+
+        BUFFER="\"kubectl\" get pods"
+
+        _zledit_batch_replace "$saved_buffer" "$token_idx"
+        local count="$REPLY"
+        echo "count:$count"
+    ' 2>&1)
+    if [[ "$result" == "count:0" ]]; then
+        test_pass "No duplicates = no batch replacements"
+    else
+        test_fail "Batch no duplicates" "Got: $result"
+    fi
+}
+
+test_batch_functions_defined() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        (( \$+functions[_zledit_token_counts] )) || exit 1
+        (( \$+functions[_zledit_batch_replace] )) || exit 1
+        (( \$+functions[_zledit_binding_to_byte] )) || exit 1
+        (( \$+functions[_zledit_find_action_by_key] )) || exit 1
+        echo 'ok'
+    " 2>&1)
+    if [[ "$result" == "ok" ]]; then
+        test_pass "All 4 batch functions defined"
+    else
+        test_fail "Batch functions missing" "$result"
+    fi
+}
+
+test_unload_cleans_batch() {
+    local result
+    result=$(zsh -c "
+        source $PLUGIN_DIR/zledit.plugin.zsh
+        zledit-unload
+        (( \$+functions[_zledit_token_counts] )) && exit 1
+        (( \$+functions[_zledit_batch_replace] )) && exit 1
+        (( \$+functions[_zledit_binding_to_byte] )) && exit 1
+        (( \$+functions[_zledit_find_action_by_key] )) && exit 1
+        exit 0
+    " 2>&1)
+    if [[ $? -eq 0 ]]; then
+        test_pass "Unload removes batch functions"
+    else
+        test_fail "Unload batch cleanup failed" "$result"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Performance tests (with thresholds)
 # ------------------------------------------------------------------------------
 
@@ -2659,9 +3006,9 @@ run_test test_var_leading_number
 run_test test_var_escapes_quotes
 
 # Replace action tests
-run_test test_replace_deletes_whole_token
-run_test test_replace_first_word
-run_test test_replace_last_word
+run_test test_replace_signals_deferred
+run_test test_replace_no_stdout
+run_test test_replace_exits_zero
 
 # Move action tests
 run_test test_move_swap_first_last
@@ -2731,6 +3078,25 @@ run_test test_fd3_metadata_mode_replace
 run_test test_fd3_metadata_mode_error
 run_test test_fd3_fallback_to_exit_codes
 run_test test_unload_cleans_extensibility
+
+# Batch-apply tests
+run_test test_batch_apply_config_default
+run_test test_single_key_config_default
+run_test test_token_counts_basic
+run_test test_duplicate_count_display
+run_test test_batch_replacement_basic
+run_test test_batch_replacement_different_lengths
+run_test test_batch_replacement_reverse_order
+run_test test_batch_trailing_newline
+run_test test_batch_skip_when_prefix_changed
+run_test test_single_mode_bypass
+run_test test_batch_config_off
+run_test test_binding_to_byte_ctrl
+run_test test_binding_to_byte_alt
+run_test test_find_action_by_key
+run_test test_batch_no_duplicates_noop
+run_test test_batch_functions_defined
+run_test test_unload_cleans_batch
 
 # Performance tests
 run_test test_perf_load_time
