@@ -148,7 +148,7 @@ With FZF, additional actions available via key combos (shown in header):
 | `Alt+1` | Single mode: apply next action to selected token only (skip batch) |
 | `;` | Enter instant mode (then press a-z to jump) |
 
-**Tip**: `Ctrl+R` pre-fills the token for editing with full zsh tab completion. Press Enter to apply the replacement to all identical tokens. Press `Ctrl-G` to cancel.
+**Tip**: `Ctrl+R` removes the token and drops you into in-context editing with full zsh tab completion. Press Enter to apply the replacement to all identical tokens. Press `Ctrl-G` to cancel.
 
 **Instant mode**: Press `;` while in the picker, then press a hint letter (a, s, d, f...) to jump directly to that word. The overlay on your command line shows which letter maps to which word.
 

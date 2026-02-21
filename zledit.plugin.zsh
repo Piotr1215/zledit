@@ -705,6 +705,7 @@ zledit-widget() {
 
     typeset -g _ze_single_mode=0
     typeset -g _ze_deferred=0
+    typeset -g _ze_deferred_prefix=""
 
     case "$_ze_result_key" in
         single)
@@ -733,44 +734,64 @@ zledit-widget() {
             local _batch_tidx="$(_zledit_extract_index "$_raw_sel")"
             _zledit_do_custom_action "$action_idx" "$_raw_sel"
             if (( _ze_deferred )); then
-                # Deferred replacement: recursive-edit with tab completion
+                # Deferred replacement: in-context recursive-edit with tab completion
                 local _target="${_ze_words[$_batch_tidx]}"
+                local _tpos="${_ze_positions[$_batch_tidx]}"
+                local _prefix="$_ze_deferred_prefix"
                 local _count=0 _i
                 for _i in {1..${#_ze_words[@]}}; do
                     [[ "${_ze_words[$_i]}" == "$_target" ]] && (( _count++ ))
                 done
-                BUFFER=""
-                CURSOR=0
+                # Delete target (or just value part if prefix set) from BUFFER at selected position
+                local _del_start _del_len
+                if [[ -n "$_prefix" ]]; then
+                    _del_start=$(( _tpos + ${#_prefix} ))
+                    _del_len=$(( ${#_target} - ${#_prefix} ))
+                else
+                    _del_start=$_tpos
+                    _del_len=${#_target}
+                fi
+                local _buf_after_delete="${BUFFER:0:$_del_start}${BUFFER:$((_del_start + _del_len))}"
+                BUFFER="$_buf_after_delete"
+                CURSOR=$_del_start
                 zle reset-prompt
                 if (( _count > 1 )); then
-                    zle -M "replace '$_target' (x${_count}) → type new value, Enter to apply, Ctrl-C cancel"
+                    zle -M "replace '$_target' (x${_count}) → Enter to apply, Ctrl-G cancel"
                 else
-                    zle -M "replace '$_target' → type new value, Enter to apply, Ctrl-C cancel"
+                    zle -M "replace '$_target' → Enter to apply, Ctrl-G cancel"
                 fi
-                bindkey '^C' send-break
                 zle recursive-edit
                 local _ret=$?
-                bindkey -r '^C'
-                local _replacement="$BUFFER"
-                if (( _ret == 0 )) && [[ -n "$_replacement" ]]; then
-                    BUFFER="$_batch_saved"
-                    local -a _all_pos=()
-                    for _i in {1..${#_ze_words[@]}}; do
-                        [[ "${_ze_words[$_i]}" == "$_target" ]] || continue
-                        _all_pos+=("${_ze_positions[$_i]}")
-                    done
-                    # Replace right-to-left to preserve positions
-                    local -a _sorted=(${(On)_all_pos})
-                    local _p
-                    for _p in "${_sorted[@]}"; do
-                        BUFFER="${BUFFER:0:$_p}${_replacement}${BUFFER:$((_p + ${#_target}))}"
-                    done
-                    # Cursor on last (rightmost) replaced element
-                    local _delta=$(( ${#_replacement} - ${#_target} ))
-                    CURSOR=$(( _sorted[1] + (${#_all_pos[@]} - 1) * _delta ))
+                if (( _ret == 0 )); then
                     if (( _count > 1 )); then
+                        # Extract what user typed at the deletion point
+                        local _typed_len=$(( ${#BUFFER} - ${#_buf_after_delete} ))
+                        local _typed_text="${BUFFER:$_del_start:$((_typed_len > 0 ? _typed_len : 0))}"
+                        # Build full replacement (prefix + typed text)
+                        local _replacement
+                        if [[ -n "$_prefix" ]]; then
+                            _replacement="${_prefix}${_typed_text}"
+                        else
+                            _replacement="$_typed_text"
+                        fi
+                        # Restore and replace ALL occurrences right-to-left
+                        BUFFER="$_batch_saved"
+                        local -a _all_pos=()
+                        for _i in {1..${#_ze_words[@]}}; do
+                            [[ "${_ze_words[$_i]}" == "$_target" ]] || continue
+                            _all_pos+=("${_ze_positions[$_i]}")
+                        done
+                        local -a _sorted=(${(On)_all_pos})
+                        local _p
+                        for _p in "${_sorted[@]}"; do
+                            BUFFER="${BUFFER:0:$_p}${_replacement}${BUFFER:$((_p + ${#_target}))}"
+                        done
+                        # Cursor on last (rightmost) replaced element
+                        local _delta=$(( ${#_replacement} - ${#_target} ))
+                        CURSOR=$(( _sorted[1] + (${#_all_pos[@]} - 1) * _delta ))
                         zle -M "zledit: replaced '$_target' (x${_count})"
                     fi
+                    # Single occurrence: BUFFER already has the final result
                 else
                     BUFFER="$_batch_saved"
                 fi
@@ -889,7 +910,7 @@ _zledit_do_custom_action() {
     local meta_out=$(<"$meta_file"); rm -f "$meta_file"
 
     # Parse fd 3 metadata if present
-    local meta_mode="" meta_cursor="" meta_pushline="" meta_message=""
+    local meta_mode="" meta_cursor="" meta_pushline="" meta_message="" meta_prefix=""
     if [[ -n "$meta_out" ]]; then
         local line
         while IFS= read -r line; do
@@ -898,6 +919,7 @@ _zledit_do_custom_action() {
                 cursor:*)   meta_cursor="${line#cursor:}" ;;
                 pushline:*) meta_pushline="${line#pushline:}" ;;
                 message:*)  meta_message="${line#message:}" ;;
+                prefix:*)   meta_prefix="${line#prefix:}" ;;
             esac
         done <<< "$meta_out"
     fi
@@ -941,6 +963,7 @@ _zledit_do_custom_action() {
                 ;;
             deferred)
                 typeset -g _ze_deferred=1
+                typeset -g _ze_deferred_prefix="$meta_prefix"
                 return 0
                 ;;
         esac
@@ -1079,7 +1102,7 @@ zledit-unload() {
           '_ze_invoke_preview_args' '_ze_hint_keys' \
           '_ze_previewer_patterns' '_ze_previewer_descriptions' '_ze_previewer_scripts' \
           '_ze_action_bindings' '_ze_action_descriptions' '_ze_action_scripts' \
-          '_ze_token_counts' '_ze_single_mode' '_ze_deferred'
+          '_ze_token_counts' '_ze_single_mode' '_ze_deferred' '_ze_deferred_prefix'
     unset Zledit
 
     return 0

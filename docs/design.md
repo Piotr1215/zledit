@@ -332,10 +332,11 @@ fi
 | | `pushline` | Save buffer, show `pushline:` command for user to execute |
 | | `pushline-exec` | Save buffer, execute `pushline:` command immediately |
 | | `error` | Show `message:` as error, abort |
-| | `deferred` | Don't modify buffer; widget handles via `zle recursive-edit` |
+| | `deferred` | In-context editing via `zle recursive-edit` (preserves tab completion) |
 | `cursor` | `N` | Set cursor to position N |
 | `pushline` | `cmd` | Command to show/execute (for pushline modes) |
 | `message` | `text` | Error message (for error mode) |
+| `prefix` | `text` | With `deferred`: keep prefix intact, edit only the value part (e.g., `prefix:VAR=` edits after `=`) |
 
 **Legacy Exit Codes:**
 
